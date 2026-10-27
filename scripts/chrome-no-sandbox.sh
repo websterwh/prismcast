@@ -27,9 +27,8 @@ if [[ -n "$SCREEN_WIDTH" && -n "$SCREEN_HEIGHT" ]]; then
 fi
 gpu_flags=()
 if [ "$PRISMCAST_USE_NVIDIA" = "1" ] || [ -e /dev/nvidia0 ] || command -v nvidia-smi >/dev/null 2>&1; then
-    # Force Chrome to use native EGL rather than Xvfb's software GLX (Mesa llvmpipe).
-    # EGL connects directly to the NVIDIA proprietary driver for NVDEC decode and hardware rasterization.
-    gpu_flags+=(--use-gl=egl)
+    # Use ANGLE with OpenGL on Xvfb virtual display for GPU compositing and NVDEC hardware acceleration.
+    gpu_flags+=(--use-gl=angle --use-angle=gl)
 fi
 
 exec /usr/bin/google-chrome-stable --no-sandbox --disable-setuid-sandbox --disable-gpu-sandbox \

@@ -35,7 +35,7 @@ import type { Nullable } from "./shared.ts";
  * - "xfinityDirect": Wait for the Comcast Polymer SPA's channelMap to populate, find the target channel by callSign, and call `_watchChannelEventHandler` to switch
  *   channels in-page. A fire-and-forget poll dismisses the Watch Now modal if it appears. Used by Xfinity Stream. Shares implementation with coxDirect via the
  *   comcastPolymer factory.
- * - "youtubeGrid": Find channel by aria-label in a non-virtualized EPG grid, extract the watch URL, and navigate directly. Used by YouTube TV.
+ * - "youtubeGrid": Find channel by aria-label in a virtualized EPG grid, extract the watch URL, and navigate directly. Used by YouTube TV.
  */
 export type ChannelSelectionStrategy =
   "coxDirect" | "directvGrid" | "foxGrid" | "guideGrid" | "hboGrid" | "none" | "slingGrid" | "spectrumGrid" | "thumbnailRow" | "tileClick" |

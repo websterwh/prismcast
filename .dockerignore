@@ -23,11 +23,16 @@ Thumbs.db
 LICENSE
 
 # Development files
-tsconfig.json
 eslint.config.js
 .eslintrc*
 .prettierrc*
 
+# AI tools and cache
+.gjc/
+.serena/
+.claude/
+.cursor/
+.codex/
 # Test files
 __tests__/
 *.test.ts

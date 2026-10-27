@@ -268,3 +268,170 @@ describe("channel cache lifecycle", () => {
     assert.equal(yttvProvider.getCachedChannels(), null, "a cleared cache reports that no enumeration has happened rather than an empty lineup");
   });
 });
+describe("virtualized guide scrolling and early exit", () => {
+
+  test("discovers all channels by incrementally scrolling across multiple virtualized windows", async () => {
+
+    const steps = [
+      {
+
+        channels: [{ name: "Channel A", watchPath: "watch/a" }],
+        clientHeight: 500,
+        newScrollTop: 250,
+        oldScrollTop: 0,
+        scrollHeight: 1000
+      },
+      {
+
+        channels: [{ name: "Channel B", watchPath: "watch/b" }],
+        clientHeight: 500,
+        newScrollTop: 500,
+        oldScrollTop: 250,
+        scrollHeight: 1000
+      },
+      {
+
+        channels: [{ name: "Channel C", watchPath: "watch/c" }],
+        clientHeight: 500,
+        newScrollTop: 500,
+        oldScrollTop: 500,
+        scrollHeight: 1000
+      }
+    ];
+
+    let stepIndex = 0;
+    const page = {
+
+      evaluate: async (): Promise<unknown> => {
+
+        const current = steps[Math.min(stepIndex, steps.length - 1)];
+
+        stepIndex++;
+
+        return current;
+      },
+      waitForSelector: async (): Promise<null> => null
+    } as unknown as Page;
+
+    const discovered = await yttvProvider.discoverChannels(page);
+
+    assert.equal(stepIndex, 3, "scrolled across all 3 steps to reach the bottom");
+    assert.deepEqual(namesOf(discovered), [ "Channel A", "Channel B", "Channel C" ], "all virtualized slices are accumulated and sorted");
+    assert.ok(yttvProvider.getCachedChannels(), "cache is marked complete after a full walk");
+  });
+
+  test("exits early during tuning as soon as the target channel is found without scrolling the rest of the guide", async () => {
+
+    const navigations: string[] = [];
+    const steps = [
+      {
+
+        channels: [{ name: "Channel A", watchPath: "watch/a" }],
+        clientHeight: 500,
+        newScrollTop: 250,
+        oldScrollTop: 0,
+        scrollHeight: 1000
+      },
+      {
+
+        channels: [{ name: "Channel B", watchPath: "watch/b" }],
+        clientHeight: 500,
+        newScrollTop: 500,
+        oldScrollTop: 250,
+        scrollHeight: 1000
+      },
+      {
+
+        channels: [{ name: "Channel C", watchPath: "watch/c" }],
+        clientHeight: 500,
+        newScrollTop: 500,
+        oldScrollTop: 500,
+        scrollHeight: 1000
+      }
+    ];
+
+    let stepIndex = 0;
+    const page = {
+
+      evaluate: async (): Promise<unknown> => {
+
+        const current = steps[Math.min(stepIndex, steps.length - 1)];
+
+        stepIndex++;
+
+        return current;
+      },
+      goto: async (url: string): Promise<null> => {
+
+        navigations.push(url);
+
+        return null;
+      },
+      waitForSelector: async (): Promise<null> => null
+    } as unknown as Page;
+
+    const result = await yttvProvider.strategy.execute(page, makeYttvProfile("Channel B"));
+
+    assert.equal(result.success, true);
+    assert.equal(stepIndex, 2, "early exit stopped at step 2 when Channel B was found, without evaluating step 3");
+    assert.deepEqual(navigations, ["https://tv.youtube.com/watch/b"], "navigates immediately to the matched watch URL");
+    assert.equal(yttvProvider.getCachedChannels(), null, "an early-exit tune does not mark the partial cache complete");
+  });
+
+  test("matches affiliate network names to local affiliates during early exit", async () => {
+
+    const navigations: string[] = [];
+    const steps = [
+      {
+
+        channels: [{ name: "Channel A", watchPath: "watch/a" }],
+        clientHeight: 500,
+        newScrollTop: 250,
+        oldScrollTop: 0,
+        scrollHeight: 1000
+      },
+      {
+
+        channels: [{ name: "NBC 5", watchPath: "watch/nbc5" }],
+        clientHeight: 500,
+        newScrollTop: 500,
+        oldScrollTop: 250,
+        scrollHeight: 1000
+      },
+      {
+
+        channels: [{ name: "Channel C", watchPath: "watch/c" }],
+        clientHeight: 500,
+        newScrollTop: 500,
+        oldScrollTop: 500,
+        scrollHeight: 1000
+      }
+    ];
+
+    let stepIndex = 0;
+    const page = {
+
+      evaluate: async (): Promise<unknown> => {
+
+        const current = steps[Math.min(stepIndex, steps.length - 1)];
+
+        stepIndex++;
+
+        return current;
+      },
+      goto: async (url: string): Promise<null> => {
+
+        navigations.push(url);
+
+        return null;
+      },
+      waitForSelector: async (): Promise<null> => null
+    } as unknown as Page;
+
+    const result = await yttvProvider.strategy.execute(page, makeYttvProfile("NBC"));
+
+    assert.equal(result.success, true);
+    assert.equal(stepIndex, 2, "stopped at step 2 when NBC 5 affiliate was matched");
+    assert.deepEqual(navigations, ["https://tv.youtube.com/watch/nbc5"], "navigates to the affiliate watch URL");
+  });
+});

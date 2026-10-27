@@ -99,9 +99,15 @@ RUN sed -i 's/^Components: main$/Components: main contrib non-free non-free-firm
     vainfo \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PrismCast globally from npm.
-RUN npm install -g prismcast
-
+# Build and install PrismCast globally from local source.
+WORKDIR /app
+COPY . .
+RUN (npm ci || npm install) \
+    && npm run build \
+    && npm pack \
+    && npm install -g prismcast-*.tgz \
+    && cd / \
+    && rm -rf /app
 # Create a Chrome wrapper script that passes --no-sandbox for container environments and enables Intel VA-API hardware video encoding.
 COPY scripts/chrome-no-sandbox.sh /usr/local/bin/chrome-no-sandbox
 RUN chmod +x /usr/local/bin/chrome-no-sandbox

@@ -132,3 +132,11 @@ dist
 .yarn/unplugged
 .yarn/build-state.yml
 .pnp.*
+
+# AI assistant directories and caches
+.gjc/
+.serena/
+.claude/
+.cursor/
+.cursorrules
+.codex/

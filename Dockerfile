@@ -83,7 +83,7 @@ RUN wget -q -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-
     && rm /tmp/google-chrome.deb \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Intel VA-API libraries for hardware-accelerated video decoding.
+# Install Intel VA-API and NVIDIA GLVND libraries for hardware-accelerated video decoding and rendering.
 RUN sed -i 's/^Components: main$/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources \
     && apt-get update && apt-get install -y \
     libva2 \
@@ -97,6 +97,11 @@ RUN sed -i 's/^Components: main$/Components: main contrib non-free non-free-firm
     i965-va-driver \
     intel-media-va-driver \
     vainfo \
+    libglvnd0 \
+    libgl1 \
+    libglx0 \
+    libegl1 \
+    libgles2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Build and install PrismCast globally from local source.
@@ -131,7 +136,8 @@ ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 ENV LIBVA_DRIVER_NAME=iHD
 ENV DISABLE_ZINK=false
 ENV DISABLE_DRI3=false
-
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=all
 # Data persistence. Mount a volume at the data directory to preserve configuration, Chrome profile, and logs across container recreations:
 #   docker run -v prismcast-data:/root/.prismcast ...
 # Custom directories are supported via PRISMCAST_DATA_DIR, PRISMCAST_CHROME_DATA_DIR, and PRISMCAST_LOG_FILE environment variables.

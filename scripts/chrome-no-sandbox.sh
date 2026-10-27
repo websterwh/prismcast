@@ -27,4 +27,5 @@ if [[ -n "$SCREEN_WIDTH" && -n "$SCREEN_HEIGHT" ]]; then
 fi
 
 exec /usr/bin/google-chrome-stable --no-sandbox --disable-setuid-sandbox --disable-gpu-sandbox \
-    "--enable-features=$features" --ignore-gpu-blocklist "${window[@]}" "${args[@]}"
+    "--enable-features=$features" --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy \
+    "${window[@]}" "${args[@]}"

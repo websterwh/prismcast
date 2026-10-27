@@ -41,10 +41,16 @@ echo "  VNC Port: ${VNC_PORT}"
 echo "  noVNC Port: ${NOVNC_PORT}"
 echo "  PrismCast Port: ${PORT:-5589}"
 echo "  Data Directory: ${DATA_DIR}"
+if [ -e /dev/nvidia0 ] || which nvidia-smi > /dev/null 2>&1; then
+  gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo "NVIDIA GPU present")
+  echo "  NVIDIA GPU: ${gpu_name}"
+fi
 if [ -e /dev/dri/renderD128 ]; then
   echo "  Intel GPU: /dev/dri/renderD128 present (LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-not set})"
 else
-  echo "  Intel GPU: no DRI device found, using software rendering"
+  if [ ! -e /dev/nvidia0 ] && ! which nvidia-smi > /dev/null 2>&1; then
+    echo "  GPU: no DRI or NVIDIA device found, using software rendering"
+  fi
 fi
 
 # Graceful shutdown handler. We terminate PrismCast first because it has its own shutdown handler that closes the browser and active streams cleanly. After

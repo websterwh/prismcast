@@ -4,6 +4,11 @@ FROM lscr.io/linuxserver/xvfb:debiantrixie AS xvfb
 
 FROM debian:trixie-slim
 
+# VirtualGL redirects Chrome's OpenGL/EGL rendering to the real NVIDIA GPU and reads back only the final composited
+# frames over plain X11 (XPutImage) into Xvfb. This is required because Xvfb has no GPU-backed X server behind it, so
+# neither GLX nor native EGL-over-X11 can reach hardware through Xvfb directly (both fall back to Mesa llvmpipe).
+# docker-entrypoint.sh and scripts/chrome-no-sandbox.sh wrap Chrome in "vglrun -d egl0" only when an NVIDIA GPU is detected.
+
 # Prevent interactive prompts during package installation.
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -103,6 +108,15 @@ RUN sed -i 's/^Components: main$/Components: main contrib non-free non-free-firm
     libglx0 \
     libegl1 \
     libgles2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# VirtualGL: redirects Chrome's GL/EGL rendering to the real NVIDIA GPU (via its EGL back end against /dev/dri or the
+# NVIDIA device) and delivers only the finished frames to Xvfb over plain X11, which is the one path that actually
+# reaches hardware through a GPU-less X server. Installed unconditionally; it is a no-op unless invoked via vglrun.
+RUN curl -fsSL -o /tmp/virtualgl.deb \
+    https://github.com/VirtualGL/virtualgl/releases/download/3.1.5/virtualgl_3.1.5_amd64.deb \
+    && apt-get update && apt-get install -y /tmp/virtualgl.deb \
+    && rm -f /tmp/virtualgl.deb \
     && rm -rf /var/lib/apt/lists/*
 
 # Build and install PrismCast globally from local source.

@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
+import pickle
 import sys
 from typing import Any, Dict, List
 from uuid import UUID
@@ -23,6 +25,35 @@ from pywidevine.pssh import PSSH
 # the same process don't re-read and re-parse the device protobuf.
 _DEVICE_CACHE: Dict[str, Device] = {}
 _CDM_SESSIONS: Dict[str, tuple[Cdm, bytes]] = {}  # session_id_hex -> (cdm, raw_session_id)
+
+
+def _save_session(session_id: bytes, session_obj: Any) -> None:
+    try:
+        sess_file = f"/tmp/prismcast_cdm_{session_id.hex()}.pkl"
+        with open(sess_file, "wb") as f:
+            pickle.dump(session_obj, f)
+    except Exception as e:
+        sys.stderr.write(f"Failed to persist CDM session: {e}\n")
+
+
+def _restore_session(cdm: Cdm, session_id: bytes) -> bool:
+    sess_file = f"/tmp/prismcast_cdm_{session_id.hex()}.pkl"
+    if not os.path.exists(sess_file):
+        return False
+    try:
+        with open(sess_file, "rb") as f:
+            session_obj = pickle.load(f)
+        sessions_dict = getattr(cdm, "_Cdm__sessions", None)
+        if sessions_dict is not None:
+            sessions_dict[session_id] = session_obj
+        try:
+            os.remove(sess_file)
+        except OSError:
+            pass
+        return True
+    except Exception as e:
+        sys.stderr.write(f"Failed to restore CDM session: {e}\n")
+        return False
 
 
 def _get_cdm(wvd_path: str) -> Cdm:
@@ -49,7 +80,9 @@ def cmd_build_challenge(wvd_path: str, pssh_b64: str) -> Dict[str, Any]:
 
     session_id = cdm.open()
     session_id_hex = session_id.hex()
+    session_obj = getattr(cdm, "_Cdm__sessions")[session_id]
     _CDM_SESSIONS[session_id_hex] = (cdm, session_id)
+    _save_session(session_id, session_obj)
 
     challenge = cdm.get_license_challenge(session_id, pssh)
     return {
@@ -79,8 +112,9 @@ def cmd_resign_challenge(wvd_path: str, challenge_b64: str) -> Dict[str, Any]:
 
     session_id = cdm.open()
     session_id_hex = session_id.hex()
+    session_obj = getattr(cdm, "_Cdm__sessions")[session_id]
     _CDM_SESSIONS[session_id_hex] = (cdm, session_id)
-
+    _save_session(session_id, session_obj)
     new_challenge = cdm.get_license_challenge(session_id, pssh)
     return {
         "session_id": session_id_hex,
@@ -90,10 +124,14 @@ def cmd_resign_challenge(wvd_path: str, challenge_b64: str) -> Dict[str, Any]:
 
 
 def cmd_parse_license(wvd_path: str, session_id_hex: str, license_b64: str) -> Dict[str, Any]:
-    if session_id_hex not in _CDM_SESSIONS:
-        raise KeyError(f"Session {session_id_hex} not found; challenges must be parsed in the same bridge process or session reconstructed.")
+    session_id = bytes.fromhex(session_id_hex)
+    if session_id_hex in _CDM_SESSIONS:
+        cdm, session_id = _CDM_SESSIONS[session_id_hex]
+    else:
+        cdm = _get_cdm(wvd_path)
+        if not _restore_session(cdm, session_id):
+            raise KeyError(f"Session {session_id_hex} not found and could not be restored from storage.")
 
-    cdm, session_id = _CDM_SESSIONS[session_id_hex]
     license_bytes = base64.b64decode(license_b64)
 
     cdm.parse_license(session_id, license_bytes)

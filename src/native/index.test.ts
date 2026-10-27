@@ -8,6 +8,7 @@
  */
 import type { AttemptNativeStreamingOptions, RefreshedFeedMetadata } from "./index.ts";
 import { TestClock, waitUntil } from "homebridge-plugin-utils/testing";
+import type { DrmKey } from "../drm/types.ts";
 import type { EmeInterceptorHandle } from "../browser/emeInterceptor.ts";
 import { afterEach, beforeEach, describe, mock, test } from "node:test";
 import { buildProbeCacheStamp, clearProbeCache } from "./probe.ts";
@@ -201,8 +202,8 @@ describe("attemptNativeStreaming", () => {
 
     const mockEmeInterceptor: EmeInterceptorHandle = {
       acquiredKeys: new Map(),
-      waitForKeys: async () => [{ key: "000102030405060708090a0b0c0d0e0f", kid: "100102030405060708090a0b0c0d0e0f", type: "CONTENT" }],
-      [Symbol.dispose]: () => {}
+      waitForKeys: async (): Promise<DrmKey[]> => [{ key: "000102030405060708090a0b0c0d0e0f", kid: "100102030405060708090a0b0c0d0e0f", type: "CONTENT" }],
+      [Symbol.dispose]: noop
     };
 
     const options = makeAttemptOptions({
@@ -232,11 +233,11 @@ describe("attemptNativeStreaming", () => {
 
     const mockEmeInterceptor: EmeInterceptorHandle = {
       acquiredKeys: new Map(),
-      waitForKeys: async () => {
+      waitForKeys: async (): Promise<DrmKey[]> => {
 
         throw new Error("Timed out waiting for DRM keys");
       },
-      [Symbol.dispose]: () => {}
+      [Symbol.dispose]: noop
     };
 
     const options = makeAttemptOptions({

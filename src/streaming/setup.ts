@@ -10,6 +10,9 @@ import { CAPTURE_SOURCE_UNAVAILABLE_MESSAGE, isChannelSelectionProfile } from ".
 import { CaptureAbandonedError, CaptureTurnTimeoutError, createCaptureLock } from "./captureLock.ts";
 import type { CaptureStream, CaptureStreamOptions } from "../browser/index.ts";
 import { FINALIZE_SETTLE_DELAY, installManifestInterceptor } from "../browser/manifestInterceptor.ts";
+import type { EmeInterceptorHandle } from "../browser/emeInterceptor.ts";
+import { installEmeInterceptor } from "../browser/emeInterceptor.ts";
+import { isDrmAvailable } from "../drm/index.ts";
 import { LOG, chromeFetch, extractDomain, formatError, getStreamContext, maxRetryDuration, registerAbortController,
   resolveFFmpegPath, retryOperation, runWithStreamContext, spawnFFmpeg, startTimer, timeoutSignal, toError, waitWithTimeout } from "../utils/index.ts";
 import type { ManifestInterceptionResult, ManifestInterceptorHandle } from "../browser/manifestInterceptor.ts";
@@ -266,6 +269,8 @@ export interface StreamSetupResult {
   // Cleanup function to release all resources. Safe to call multiple times.
   cleanup: () => Promise<void>;
 
+  // Optional in-browser EME interceptor handle for Widevine DRM key acquisition.
+  emeInterceptor?: Nullable<EmeInterceptorHandle>;
   // Manifest interceptor handle from the CDP listener installed before navigation. Contains the interception promise and a finalize() function that the caller
   // invokes after channel selection is complete. Null if the interceptor was not installed: a channel locked to screen capture, a DRM-cached binding, or an
   // install that failed.
@@ -414,6 +419,8 @@ export interface CreatePageWithCaptureResult {
   // rather than DOM interaction; the last case has nothing for the manifest interceptor to wait through.
   directTune: boolean;
 
+  // Optional in-browser EME interceptor handle for Widevine DRM key acquisition.
+  emeInterceptor?: Nullable<EmeInterceptorHandle>;
   // Manifest interceptor handle for native streaming, or null if interception was not installed.
   manifestInterception: Nullable<ManifestInterceptorHandle>;
 
@@ -652,6 +659,16 @@ export async function createPageWithCapture(options: CreatePageWithCaptureOption
   // whichever way this tab becomes the selected one, the capture's composition moves back to the emulated surface about a second later.
   await deps.installActivationHeal(page);
 
+  let emeInterceptor: Nullable<EmeInterceptorHandle> = null;
+
+  try {
+
+    emeInterceptor = await installEmeInterceptor(page);
+    resources.use(emeInterceptor);
+  } catch(error) {
+
+    LOG.debug("streaming:setup", "Failed to install EME interceptor for %s: %s.", streamId, String(error));
+  }
   // The capture's Matroska MIME type carries the codec decision, which is the codec module's: it weighs the user's allowlist against the GPU's hardware encoders.
   const captureMimeType = getCaptureMimeType();
 
@@ -1016,6 +1033,7 @@ export async function createPageWithCapture(options: CreatePageWithCaptureOption
     // The kind the interception is finalized against, derived by the shared formula from this path's tune facts and the profile.
     directTune: computeDirectTuneKind({ profile, strategyDirectTune, usedDirectUrl }),
 
+    emeInterceptor,
     manifestInterception,
     page
   };
@@ -1381,7 +1399,8 @@ export async function setupStream(options: StreamSetupOptions, onCircuitBreak: (
        * attempt runs, no probe fires, and the encryption cache stays untouched by that stream. The cache half avoids creating a CDP observer that can produce
        * nothing a DRM stream could use; every stream carries an identity, ad-hoc URLs included, so that lookup needs no guard.
        */
-      const skipInterception = (channel?.forceCapture === true) || (getCachedEncryption(probeIdentity, systemClock.now()) === "drm");
+      const drmAvailable = await isDrmAvailable();
+      const skipInterception = (channel?.forceCapture === true) || (!drmAvailable && (getCachedEncryption(probeIdentity, systemClock.now()) === "drm"));
 
       // Build the persistResolution closure for the active channel. When the resolution layer in selectChannel() converts a category selector to a concrete call
       // sign, this closure writes the result to the user's channel store as a per-service-variant override - the same shape produced when a user manually edits
@@ -1566,6 +1585,7 @@ export async function setupStream(options: StreamSetupOptions, onCircuitBreak: (
       channelName: channel?.name ?? null,
       cleanup,
       directTune,
+      emeInterceptor: captureResult.emeInterceptor,
       manifestInterception,
       monitor,
       numericStreamId,

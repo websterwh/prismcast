@@ -2,13 +2,15 @@
  *
  * proxy.ts: Native HLS proxy - manifest polling, segment fetching, and playlist generation.
  */
-import { LOG, chromeFetch, resolveUrl, startTimer, timeoutSignal } from "../utils/index.ts";
+import { LOG, chromeFetch, formatError, resolveUrl, startTimer, timeoutSignal } from "../utils/index.ts";
 import type { MediaContainer, Nullable } from "../types/index.ts";
 import { buildPrerollEntries, buildPrerollInitUri, computePrerollWindow } from "../streaming/preroll.ts";
+import { decryptInitSegment, decryptMediaSegment } from "../drm/index.ts";
 import { decryptSegment, deriveIvFromSequence, fetchDecryptionKey, parseExplicitIv } from "./decrypt.ts";
 import { findNamedInitSegment, pruneNamedInitSegments, storeAudioSegment, storeNamedInitSegment, storeSegment, updateAudioPlaylist, updatePlaylist,
   updateVideoPlaylist } from "../streaming/hlsSegments.ts";
 import { CAPTURE_BASELINE_CODEC } from "../types/index.ts";
+import type { DrmKey } from "../drm/types.ts";
 import { CONFIG } from "../config/index.ts";
 import type { CaptureCodec } from "../streaming/codec.ts";
 import type { Clock } from "homebridge-plugin-utils";
@@ -130,7 +132,9 @@ export interface NativeProxyOptions {
   container: MediaContainer;
 
   // Encryption type classified by the probe.
-  encryption: "aes128" | "clear";
+  encryption: "aes128" | "clear" | "drm";
+  // DRM keys for segment decryption when encryption is "drm".
+  drmKeys?: readonly DrmKey[];
 
   // AES-128 key URL from the probe result. Required when encryption is "aes128".
   keyUrl: Nullable<string>;
@@ -389,6 +393,7 @@ interface VideoTrackingState {
   initCounter: number;
   lastMediaSequence: number;
   lastUpstreamMapUri: Nullable<string>;
+  rawEncInit: Nullable<Buffer>;
   lastSegmentSize: Nullable<number>;
   lastSegmentTime: number;
   lastTargetDuration: number;
@@ -412,6 +417,7 @@ interface AudioTrackingState {
   initCounter: number;
   lastTargetDuration: number;
   lastUpstreamMapUri: Nullable<string>;
+  rawEncInit: Nullable<Buffer>;
   metadata: SegmentMetadata;
   segmentIndex: number;
   segmentTracker: SegmentFetchTracker;
@@ -428,6 +434,7 @@ interface InitTrackingState {
   initCounter: number;
   lastUpstreamMapUri: Nullable<string>;
   segmentTracker: SegmentFetchTracker;
+  rawEncInit?: Nullable<Buffer>;
 }
 
 /**
@@ -462,6 +469,7 @@ interface ProxyContext {
   // The clock the relay's segment-store calls take their instant from, so a store the relay drives stamps on the proxy's own time source rather than the store's
   // default reading.
   readonly clock: Clock;
+  readonly drmKeys?: readonly DrmKey[];
 
   lifecycle: ProxyLifecycleState;
   onError: (error: string) => void;
@@ -1009,7 +1017,7 @@ async function resolveTrackInit(options: { ctx: ProxyContext; fetchSegment: Segm
 
   const { ctx, fetchSegment, mapUri, track, tracking } = options;
 
-  const data = await fetchSegment(tracking.segmentTracker, mapUri, 0, null, null);
+  let data = await fetchSegment(tracking.segmentTracker, mapUri, 0, null, null);
 
   if(!data) {
 
@@ -1018,6 +1026,25 @@ async function resolveTrackInit(options: { ctx: ProxyContext; fetchSegment: Segm
     return;
   }
 
+  if(ctx.lifecycle.stopped) {
+
+    return;
+  }
+
+  if(ctx.drmKeys && (ctx.drmKeys.length > 0)) {
+
+    tracking.rawEncInit = data;
+
+    try {
+
+      data = await decryptInitSegment(data, ctx.drmKeys);
+    } catch(error) {
+
+      LOG.warn("Failed to decrypt %s initialization segment for %s: %s.", track, ctx.channelName, formatError(error));
+
+      return;
+    }
+  }
   if(ctx.lifecycle.stopped) {
 
     return;
@@ -1647,6 +1674,7 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
     lastSegmentTime: 0,
     lastTargetDuration: 6,
     lastUpstreamMapUri: null,
+    rawEncInit: null,
     metadata: createSegmentMetadata(),
     segmentIndex: prerollSegmentCount,
     segmentTracker: { consecutiveFailures: 0, debugLabel: "Segment", label: "segment" },
@@ -1664,6 +1692,7 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
     initCounter: 0,
     lastTargetDuration: 6,
     lastUpstreamMapUri: null,
+    rawEncInit: null,
     metadata: createSegmentMetadata(),
     segmentIndex: 0,
     segmentTracker: { consecutiveFailures: 0, debugLabel: "Audio segment", label: "audio segment" },
@@ -1692,8 +1721,7 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
   };
 
   // Shared context for extracted module-level functions. Bundles immutable references with shared mutable state objects.
-  const ctx: ProxyContext = { channelName, clock, lifecycle, onError, stats, streamId };
-
+  const ctx: ProxyContext = { channelName, clock, drmKeys: options.drmKeys, lifecycle, onError, stats, streamId };
   /* The two tracks' pipeline bindings. Construction happens here, at the proxy's composition root, so the pipeline that serves both loops carries no branch on
    * which track it is running: everything that differs between them - where segments are stored, how many are stored, how they are named, which initialization
    * slot they read, and the extra bookkeeping video alone keeps - is data on these two objects.
@@ -1721,7 +1749,7 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
     },
     countStored: (id: number): number => getStream(id)?.hls.segments.size ?? 0,
     fetchInit: fetchTrackedSegment,
-    fetchSegment: prefetchSegment,
+    fetchSegment: (segment: ParsedSegment): Promise<Nullable<Buffer>> => prefetchSegment(segment, video.rawEncInit),
     filenamePrefix: "segment",
     initTrack: "video",
     store: storeSegment,
@@ -1732,7 +1760,7 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
 
     countStored: (id: number): number => getStream(id)?.hls.audioSegments.size ?? 0,
     fetchInit: fetchTrackedSegment,
-    fetchSegment: prefetchSegment,
+    fetchSegment: (segment: ParsedSegment): Promise<Nullable<Buffer>> => prefetchSegment(segment, audio.rawEncInit),
     filenamePrefix: "audio",
     initTrack: "audio",
     store: storeAudioSegment,
@@ -2017,7 +2045,7 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
    * @returns The segment data (decrypted if necessary), or null on failure.
    */
   async function fetchAndDecryptSegment(url: string, sequence: number, ivHex: Nullable<string>, segKeyUrl: Nullable<string>,
-    abortSignal?: AbortSignal): Promise<Nullable<Buffer>> {
+    abortSignal?: AbortSignal, rawEncInit?: Nullable<Buffer>): Promise<Nullable<Buffer>> {
 
     // The caller's cancellation and this fetch's own bound are composed, so the segment ends on whichever arrives first and a caller with nothing to cancel gets
     // the bound alone.
@@ -2086,6 +2114,18 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
 
       data = decryptSegment(data, key, ivResult.iv);
     }
+    if(ctx.drmKeys && (ctx.drmKeys.length > 0) && rawEncInit) {
+
+      try {
+
+        data = await decryptMediaSegment(rawEncInit, data, ctx.drmKeys);
+      } catch(error) {
+
+        LOG.warn("Failed to decrypt segment %s for %s: %s.", sequence, channelName, formatError(error));
+
+        return null;
+      }
+    }
 
     return data;
   }
@@ -2097,9 +2137,9 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
    * @param segment - The parsed segment to fetch.
    * @returns The segment data (decrypted if necessary), or null on failure.
    */
-  async function prefetchSegment(segment: ParsedSegment): Promise<Nullable<Buffer>> {
+  async function prefetchSegment(segment: ParsedSegment, rawEncInit?: Nullable<Buffer>): Promise<Nullable<Buffer>> {
 
-    return fetchAndDecryptSegment(segment.url, segment.sequence, segment.ivHex, segment.keyUrl, lifecycle.abortController.signal);
+    return fetchAndDecryptSegment(segment.url, segment.sequence, segment.ivHex, segment.keyUrl, lifecycle.abortController.signal, rawEncInit);
   }
 
   /**

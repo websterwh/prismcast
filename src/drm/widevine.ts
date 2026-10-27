@@ -1,0 +1,272 @@
+/* Copyright(C) 2024-2026, HJD (https://github.com/hjdhjd). All rights reserved.
+ *
+ * widevine.ts: Widevine CDM client using the Python sidecar bridge.
+ */
+
+import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import type { DrmContext, DrmKey, WidevineChallenge, WidevineDeviceInfo } from "./types.ts";
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+
+/** Well-known fallback candidate paths for the python interpreter with pywidevine. */
+const DEFAULT_PYTHON_CANDIDATES = [
+  "/home/william/Documents/projects/unshackle/.venv/bin/python",
+  "/home/william/Documents/projects/unshackle/.venv/bin/python3",
+  "python3"
+];
+
+/** Default Widevine Device file location on this host. */
+export const DEFAULT_WVD_PATH =
+  "/home/william/Documents/projects/unshackle/unshackle/WVDs/google_aosp_on_ia_emulator_14.0.0_f63e4253_4464_l3.wvd";
+
+/** Default bridge script path relative to this file. */
+export const DEFAULT_BRIDGE_PATH = path.join(currentDir, "widevine_bridge.py");
+
+/**
+ * Resolves the Python executable path.
+ */
+export async function resolvePythonBin(ctx?: DrmContext): Promise<string> {
+
+  if(ctx?.pythonBin) {
+
+    return ctx.pythonBin;
+  }
+
+  for(const candidate of DEFAULT_PYTHON_CANDIDATES) {
+
+    try {
+
+      await fs.access(candidate, fs.constants.X_OK);
+
+      return candidate;
+    } catch {
+
+      // Continue searching
+    }
+  }
+
+  return "python3";
+}
+
+/**
+ * Resolves the WVD device path.
+ */
+export function resolveWvdPath(wvdPath?: string, ctx?: DrmContext): string {
+
+  const resolved = wvdPath || ctx?.wvdPath || DEFAULT_WVD_PATH;
+
+  if(!resolved) {
+
+    throw new Error("No Widevine Device (.wvd) path specified and default is unset.");
+  }
+
+  return resolved;
+}
+
+/**
+ * Checks whether Widevine DRM decryption is available on this host.
+ * Returns true if the .wvd device file exists and is readable.
+ */
+export async function isDrmAvailable(ctx?: DrmContext): Promise<boolean> {
+
+  try {
+
+    const wvd = resolveWvdPath(undefined, ctx);
+
+    await fs.access(wvd, fs.constants.R_OK);
+
+    return true;
+  } catch {
+
+    return false;
+  }
+}
+
+interface BridgeResponse<T = unknown> {
+
+  error?: string;
+  result?: T;
+  status: "error" | "ok";
+}
+
+/**
+ * Executes a single command on the Widevine bridge script over stdin/stdout.
+ */
+async function callBridge<T>(
+  request: Record<string, unknown>,
+  ctx?: DrmContext
+): Promise<T> {
+
+  const pythonBin = await resolvePythonBin(ctx);
+  const bridgeScript = ctx?.widevineBridgePath || DEFAULT_BRIDGE_PATH;
+
+  return new Promise<T>((resolve, reject) => {
+
+    const proc = execFile(
+      pythonBin,
+      [ bridgeScript, "--json" ],
+      { maxBuffer: 10 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+
+        if(error) {
+
+          reject(new Error(`Bridge execution failed: ${error.message}${stderr ? ` (${stderr.trim()})` : ""}`));
+
+          return;
+        }
+
+        try {
+
+          const resp = JSON.parse(stdout.trim()) as BridgeResponse<T>;
+
+          if(resp.status !== "ok") {
+
+            reject(new Error(resp.error || "Unknown bridge failure"));
+
+            return;
+          }
+          resolve(resp.result as T);
+        } catch(parseError) {
+
+          reject(new Error(`Failed to parse bridge output: ${String(parseError)} | raw: ${stdout}`));
+        }
+      }
+    );
+
+    proc.stdin?.write(JSON.stringify(request) + "\n");
+    proc.stdin?.end();
+  });
+}
+
+/**
+ * Queries device information and security level from a Widevine device file.
+ *
+ * @param wvdPath - Path to the .wvd file. Defaults to DEFAULT_WVD_PATH.
+ * @param ctx - Optional runtime context.
+ */
+export async function getDeviceInfo(
+  wvdPath?: string,
+  ctx?: DrmContext
+): Promise<WidevineDeviceInfo> {
+
+  const resolvedWvd = resolveWvdPath(wvdPath, ctx);
+
+  return callBridge<WidevineDeviceInfo>(
+    { cmd: "device_info", wvd_path: resolvedWvd },
+    ctx
+  );
+}
+
+/**
+ * Builds a Widevine license challenge for a given PSSH box.
+ *
+ * @param pssh - The PSSH box as a Buffer or base64 string.
+ * @param wvdPath - Optional path to the .wvd device.
+ * @param ctx - Optional runtime context.
+ * @returns Challenge result containing the raw challenge buffer and correlating session ID.
+ */
+export async function buildChallenge(
+  pssh: Buffer | string,
+  wvdPath?: string,
+  ctx?: DrmContext
+): Promise<WidevineChallenge> {
+
+  const resolvedWvd = resolveWvdPath(wvdPath, ctx);
+  const psshB64 = Buffer.isBuffer(pssh) ? pssh.toString("base64") : pssh;
+
+  interface RawChallengeResult {
+
+    challenge_b64: string;
+    challenge_bytes: number;
+    session_id: string;
+  }
+
+  const raw = await callBridge<RawChallengeResult>(
+    { cmd: "build_challenge", pssh_b64: psshB64, wvd_path: resolvedWvd },
+    ctx
+  );
+
+  return {
+
+    challenge: Buffer.from(raw.challenge_b64, "base64"),
+    sessionId: raw.session_id
+  };
+}
+
+/**
+ * Resigns an intercepted browser Widevine challenge using our local WVD device,
+ * enabling seamless key extraction from the upstream DRM server response.
+ *
+ * @param challenge - The browser's intercepted challenge as a Buffer or base64 string.
+ * @param wvdPath - Optional path to the .wvd device.
+ * @param ctx - Optional runtime context.
+ * @returns Challenge result containing the new challenge buffer and correlating session ID.
+ */
+export async function resignChallenge(
+  challenge: Buffer | string,
+  wvdPath?: string,
+  ctx?: DrmContext
+): Promise<WidevineChallenge> {
+
+  const resolvedWvd = resolveWvdPath(wvdPath, ctx);
+  const challengeB64 = Buffer.isBuffer(challenge) ? challenge.toString("base64") : challenge;
+
+  interface RawResignResult {
+    challenge_b64: string;
+    challenge_bytes: number;
+    session_id: string;
+  }
+
+  const raw = await callBridge<RawResignResult>(
+    { challenge_b64: challengeB64, cmd: "resign_challenge", wvd_path: resolvedWvd },
+    ctx
+  );
+
+  return {
+    challenge: Buffer.from(raw.challenge_b64, "base64"),
+    sessionId: raw.session_id
+  };
+}
+
+/**
+ * Parses a Widevine license server response, returning the extracted Content Decryption Keys.
+ *
+ * @param sessionId - The session ID returned from buildChallenge().
+ * @param licenseResponse - Raw license response bytes returned by the DRM server.
+ * @param wvdPath - Optional path to the .wvd device.
+ * @param ctx - Optional runtime context.
+ * @returns Array of decrypted DRM keys (KID:KEY pairs).
+ */
+export async function parseLicense(
+  sessionId: string,
+  licenseResponse: Buffer | string,
+  wvdPath?: string,
+  ctx?: DrmContext
+): Promise<DrmKey[]> {
+
+  const resolvedWvd = resolveWvdPath(wvdPath, ctx);
+  const licenseB64 = Buffer.isBuffer(licenseResponse) ?
+    licenseResponse.toString("base64") :
+    licenseResponse;
+
+  interface RawParseResult {
+
+    keys: DrmKey[];
+  }
+
+  const res = await callBridge<RawParseResult>(
+    {
+
+      cmd: "parse_license",
+      license_b64: licenseB64,
+      session_id: sessionId,
+      wvd_path: resolvedWvd
+    },
+    ctx
+  );
+
+  return res.keys;
+}

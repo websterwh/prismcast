@@ -8,6 +8,7 @@
  */
 import type { AttemptNativeStreamingOptions, RefreshedFeedMetadata } from "./index.ts";
 import { TestClock, waitUntil } from "homebridge-plugin-utils/testing";
+import type { EmeInterceptorHandle } from "../browser/emeInterceptor.ts";
 import { afterEach, beforeEach, describe, mock, test } from "node:test";
 import { buildProbeCacheStamp, clearProbeCache } from "./probe.ts";
 import { closePuppeteerStreamWssOnIdle, noop } from "../testing.helpers.ts";
@@ -186,6 +187,69 @@ describe("attemptNativeStreaming", () => {
     const result = await attemptNativeStreaming(options);
 
     assert.equal(result, null, "DRM classification returns null");
+  });
+
+  test("upgrades to native streaming when DRM keys are acquired via EME interceptor", async () => {
+
+    const masterUrl = "https://cdn.test/drm-eme-master.m3u8";
+    const variantUrl = "https://cdn.test/drm-eme-variant.m3u8";
+
+    makeFetchRouter({
+      [masterUrl]: () => new Response("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000\ndrm-eme-variant.m3u8\n", { status: 200 }),
+      [variantUrl]: () => new Response("#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES-CTR,KEYFORMAT=\"urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed\",URI=\"data:text/plain;base64,...\"\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:6,\nseg0.m4s\n#EXTINF:6,\nseg1.m4s\n", { status: 200 })
+    });
+
+    const mockEmeInterceptor: EmeInterceptorHandle = {
+      acquiredKeys: new Map(),
+      waitForKeys: async () => [{ key: "000102030405060708090a0b0c0d0e0f", kid: "100102030405060708090a0b0c0d0e0f", type: "CONTENT" }],
+      [Symbol.dispose]: () => {}
+    };
+
+    const options = makeAttemptOptions({
+      channelName: "drm-eme-test",
+      emeInterceptor: mockEmeInterceptor,
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+    });
+
+    clearProbeCache("drm-eme-test");
+
+    const result = await attemptNativeStreaming(options);
+
+    assert.ok(result, "DRM stream with EME keys upgrades to native streaming");
+    assert.equal(result.container, "fmp4", "container is fmp4");
+    result.proxy.stop();
+  });
+
+  test("falls back to capture when EME key acquisition times out or rejects", async () => {
+
+    const masterUrl = "https://cdn.test/drm-timeout-master.m3u8";
+    const variantUrl = "https://cdn.test/drm-timeout-variant.m3u8";
+
+    makeFetchRouter({
+      [masterUrl]: () => new Response("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000\ndrm-timeout-variant.m3u8\n", { status: 200 }),
+      [variantUrl]: () => new Response("#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"skd://x\"\n#EXTINF:6,\nseg0.ts\n#EXTINF:6,\nseg1.ts\n", { status: 200 })
+    });
+
+    const mockEmeInterceptor: EmeInterceptorHandle = {
+      acquiredKeys: new Map(),
+      waitForKeys: async () => {
+
+        throw new Error("Timed out waiting for DRM keys");
+      },
+      [Symbol.dispose]: () => {}
+    };
+
+    const options = makeAttemptOptions({
+      channelName: "drm-timeout-test",
+      emeInterceptor: mockEmeInterceptor,
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+    });
+
+    clearProbeCache("drm-timeout-test");
+
+    const result = await attemptNativeStreaming(options);
+
+    assert.equal(result, null, "Failed EME key acquisition falls back to capture");
   });
 
   test("returns a NativeStreamResult on the clear-encryption happy path", async () => {

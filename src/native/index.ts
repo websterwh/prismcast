@@ -8,6 +8,8 @@ import type { MediaFeed, PipelineShape, ProbeCacheIdentity } from "./probe.ts";
 import { clearProbeCache, probeManifest } from "./probe.ts";
 import type { CaptureCodec } from "../streaming/codec.ts";
 import type { Clock } from "homebridge-plugin-utils";
+import type { DrmKey } from "../drm/types.ts";
+import type { EmeInterceptorHandle } from "../browser/emeInterceptor.ts";
 import type { ManifestInterceptionResult } from "../browser/manifestInterceptor.ts";
 import type { NativeProxy } from "./proxy.ts";
 import type { Page } from "puppeteer-core";
@@ -78,6 +80,8 @@ export interface AttemptNativeStreamingOptions {
   // chain takes the system clock.
   readonly clock?: Clock;
 
+  // Optional in-browser EME interceptor for Widevine DRM key acquisition.
+  readonly emeInterceptor?: Nullable<EmeInterceptorHandle>;
   // The manifest interception promise from the CDP listener installed before navigation.
   readonly interceptionPromise: Promise<Nullable<ManifestInterceptionResult>>;
 
@@ -220,11 +224,30 @@ export async function attemptNativeStreaming(options: AttemptNativeStreamingOpti
     return null;
   }
 
+  let drmKeys: DrmKey[] | undefined;
+
   if(mediaFeed.encryption === "drm") {
 
-    LOG.debug("native:coordinator", "Native streaming not viable for %s: DRM-protected stream.", channelName);
+    if(options.emeInterceptor) {
 
-    return null;
+      LOG.info("DRM stream detected for %s; waiting for Widevine content keys...", channelName);
+
+      try {
+
+        drmKeys = await options.emeInterceptor.waitForKeys(15000);
+        LOG.info("Acquired %d Widevine content keys for %s; enabling native DRM relay.", drmKeys.length, channelName);
+      } catch(error) {
+
+        LOG.warn("Failed to acquire Widevine content keys for %s: %s. Falling back to capture.", channelName, formatError(error));
+
+        return null;
+      }
+    } else {
+
+      LOG.debug("native:coordinator", "Native streaming not viable for %s: DRM-protected stream and no EME interceptor.", channelName);
+
+      return null;
+    }
   }
 
   // Separate audio renditions (e.g., Google DAI on BET/VH1) cannot be served to MPEG-TS clients because the independent video and audio MPEG-TS segments have
@@ -236,10 +259,9 @@ export async function attemptNativeStreaming(options: AttemptNativeStreamingOpti
     return null;
   }
 
-  /* The proxy is built around the feed's container, so a feed that carries none cannot become a pipeline. Only a DRM classification leaves it null, and that
-   * path returned above, so this guard answers a state the flow does not reach rather than inventing a container to satisfy the option's type.
-   */
-  if(mediaFeed.container === null) {
+  const container = mediaFeed.container ?? ((mediaFeed.encryption === "drm") ? "fmp4" : null);
+
+  if(container === null) {
 
     LOG.debug("native:coordinator", "Native streaming not viable for %s: the probe returned no container classification.", channelName);
 
@@ -279,9 +301,10 @@ export async function attemptNativeStreaming(options: AttemptNativeStreamingOpti
     audioVariantUrl: mediaFeed.audioVariantUrl,
     channelName,
     clock,
-    container: mediaFeed.container,
+    container,
     encryption: mediaFeed.encryption,
     keyUrl: mediaFeed.keyUrl,
+    drmKeys,
     onError,
     prefetchedKey,
     prerollCodec: options.prerollCodec,
@@ -310,7 +333,7 @@ export async function attemptNativeStreaming(options: AttemptNativeStreamingOpti
 
   LOG.debug("timing:native", "Native streaming setup completed for %s in %sms.", channelName, elapsed());
 
-  return { bandwidth: mediaFeed.bandwidth, codec: mediaFeed.codec, container: mediaFeed.container, hasAudio: mediaFeed.audioVariantUrl !== null, proxy,
+  return { bandwidth: mediaFeed.bandwidth, codec: mediaFeed.codec, container, hasAudio: mediaFeed.audioVariantUrl !== null, proxy,
     resolution: mediaFeed.resolution };
 }
 

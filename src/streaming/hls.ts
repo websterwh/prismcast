@@ -1394,6 +1394,7 @@ async function startNativeProxy(options: NativeProxyOptions): Promise<Nullable<N
   const nativeResult = await attemptNativeStreaming({
 
     channelName,
+    emeInterceptor: setup.emeInterceptor,
     interceptionPromise: setup.manifestInterception.promise,
     mpegTsClient,
     onError: (error) => {

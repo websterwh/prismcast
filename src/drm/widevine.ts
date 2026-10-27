@@ -5,7 +5,7 @@
 
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DrmContext, DrmKey, WidevineChallenge, WidevineDeviceInfo } from "./types.ts";
@@ -34,6 +34,14 @@ const DEFAULT_WVD_CANDIDATES = [
   "/etc/prismcast/drm/device.wvd",
   DEFAULT_WVD_PATH
 ].filter((p): p is string => Boolean(p));
+
+/** Candidate directories to search for any *.wvd device file. */
+const DEFAULT_WVD_DIRECTORIES = [
+  "/root/.prismcast/drm",
+  "/root/.prismcast",
+  "/etc/prismcast/drm",
+  "/home/william/Documents/projects/unshackle/unshackle/WVDs"
+];
 
 /** Default bridge script path relative to this file. */
 export const DEFAULT_BRIDGE_PATH = path.join(currentDir, "widevine_bridge.py");
@@ -84,6 +92,26 @@ export function resolveWvdPath(wvdPath?: string, ctx?: DrmContext): string {
     if(existsSync(candidate)) {
 
       return candidate;
+    }
+  }
+
+  for(const dir of DEFAULT_WVD_DIRECTORIES) {
+
+    if(existsSync(dir)) {
+
+      try {
+
+        const files = readdirSync(dir);
+        const match = files.find((f) => f.toLowerCase().endsWith(".wvd"));
+
+        if(match) {
+
+          return path.join(dir, match);
+        }
+      } catch {
+
+        // Ignore directory read errors and continue searching
+      }
     }
   }
 

@@ -9,6 +9,7 @@ import { setupCdpEndpoint } from "./cdp.ts";
 import { setupChannelsEndpoint } from "./channels.ts";
 import { setupConfigEndpoint } from "./config/index.ts";
 import { setupDebugEndpoint } from "./debug.ts";
+import { setupEpgEndpoint } from "./epg.ts";
 import { setupHLSRoutes } from "./hls.ts";
 import { setupHealthEndpoint } from "./health.ts";
 import { setupLogsEndpoint } from "./logs.ts";
@@ -36,6 +37,7 @@ export function setupRoutes(app: Express): void {
   setupChannelsEndpoint(app);
   setupConfigEndpoint(app);
   setupDebugEndpoint(app);
+  setupEpgEndpoint(app);
   setupHealthEndpoint(app);
   setupHLSRoutes(app);
   setupLogsEndpoint(app);

@@ -22,9 +22,17 @@ mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 export XDG_RUNTIME_DIR
 
-# Fallback Intel VA-API driver selection. The image already pins LIBVA_DRIVER_NAME=iHD via the Dockerfile ENV, so this block only takes effect if that ENV is
-# dropped or the runtime unsets LIBVA_DRIVER_NAME. iHD is the driver for Intel Gen 9+ (Skylake and newer); override with LIBVA_DRIVER_NAME=i965 for older hardware.
-if [ -z "$LIBVA_DRIVER_NAME" ] && [ -e /dev/dri/renderD128 ]; then
+# Dynamic GPU and VA-API driver configuration.
+# If an NVIDIA GPU is present (--gpus all / nvidia container runtime), use the nvidia-vaapi-driver
+# for NVDEC hardware video decoding and EGL for hardware rasterization.
+if [ -e /dev/nvidia0 ] || command -v nvidia-smi > /dev/null 2>&1; then
+  export LIBVA_DRIVER_NAME=nvidia
+  export NVD_BACKEND=direct
+  export NVIDIA_VISIBLE_DEVICES=all
+  export NVIDIA_DRIVER_CAPABILITIES=all
+  export PRISMCAST_USE_NVIDIA=1
+elif [ -z "$LIBVA_DRIVER_NAME" ] && [ -e /dev/dri/renderD128 ]; then
+  # Fallback Intel VA-API driver selection for Intel Gen 9+ (iHD) or older hardware (i965).
   export LIBVA_DRIVER_NAME=iHD
 fi
 
@@ -41,16 +49,14 @@ echo "  VNC Port: ${VNC_PORT}"
 echo "  noVNC Port: ${NOVNC_PORT}"
 echo "  PrismCast Port: ${PORT:-5589}"
 echo "  Data Directory: ${DATA_DIR}"
-if [ -e /dev/nvidia0 ] || which nvidia-smi > /dev/null 2>&1; then
+if [ -n "$PRISMCAST_USE_NVIDIA" ]; then
   gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo "NVIDIA GPU present")
-  echo "  NVIDIA GPU: ${gpu_name}"
+  echo "  NVIDIA GPU: ${gpu_name} (LIBVA_DRIVER_NAME=nvidia, NVD_BACKEND=direct)"
 fi
-if [ -e /dev/dri/renderD128 ]; then
+if [ -e /dev/dri/renderD128 ] && [ -z "$PRISMCAST_USE_NVIDIA" ]; then
   echo "  Intel GPU: /dev/dri/renderD128 present (LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-not set})"
-else
-  if [ ! -e /dev/nvidia0 ] && ! which nvidia-smi > /dev/null 2>&1; then
-    echo "  GPU: no DRI or NVIDIA device found, using software rendering"
-  fi
+elif [ -z "$PRISMCAST_USE_NVIDIA" ] && [ ! -e /dev/dri/renderD128 ]; then
+  echo "  GPU: no DRI or NVIDIA device found, using software rendering"
 fi
 
 # Graceful shutdown handler. We terminate PrismCast first because it has its own shutdown handler that closes the browser and active streams cleanly. After

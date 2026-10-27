@@ -97,6 +97,7 @@ RUN sed -i 's/^Components: main$/Components: main contrib non-free non-free-firm
     i965-va-driver \
     intel-media-va-driver \
     vainfo \
+    nvidia-vaapi-driver \
     libglvnd0 \
     libgl1 \
     libglx0 \
@@ -133,7 +134,6 @@ ENV CHROME_BIN=/usr/local/bin/chrome-no-sandbox
 ENV PRISMCAST_CONTAINER=1
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV XDG_RUNTIME_DIR=/tmp/runtime-root
-ENV LIBVA_DRIVER_NAME=iHD
 ENV DISABLE_ZINK=false
 ENV DISABLE_DRI3=false
 ENV NVIDIA_VISIBLE_DEVICES=all

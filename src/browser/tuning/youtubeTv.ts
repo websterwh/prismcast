@@ -649,6 +649,8 @@ export const yttvProvider: ProviderModule = {
     channelSelection: { strategy: "youtubeGrid" },
     description: "YouTube TV with EPG grid channel selection. Set Channel Selector to the channel name as shown in the guide (e.g., CNN, ESPN, NBC).",
     extends: "fullscreenApi",
+    fullscreenKey: "f",
+    fullscreenSelector: "button.ytp-fullscreen-button",
     selectReadyVideo: true,
     summary: "YouTube TV (guide grid, needs selector)"
   },

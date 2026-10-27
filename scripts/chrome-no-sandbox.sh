@@ -25,7 +25,13 @@ window=()
 if [[ -n "$SCREEN_WIDTH" && -n "$SCREEN_HEIGHT" ]]; then
     window=(--window-position=0,0 "--window-size=$SCREEN_WIDTH,$SCREEN_HEIGHT")
 fi
+gpu_flags=()
+if [ "$PRISMCAST_USE_NVIDIA" = "1" ] || [ -e /dev/nvidia0 ] || command -v nvidia-smi >/dev/null 2>&1; then
+    # Force Chrome to use EGL rather than Xvfb's software GLX (Mesa llvmpipe).
+    # EGL accesses the NVIDIA driver directly, enabling hardware rasterization and NVDEC video decode.
+    gpu_flags+=(--use-gl=angle --use-angle=gl-egl)
+fi
 
 exec /usr/bin/google-chrome-stable --no-sandbox --disable-setuid-sandbox --disable-gpu-sandbox \
     "--enable-features=$features" --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy \
-    "${window[@]}" "${args[@]}"
+    "${gpu_flags[@]}" "${window[@]}" "${args[@]}"

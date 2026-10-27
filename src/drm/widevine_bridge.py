@@ -137,12 +137,27 @@ def cmd_parse_license(wvd_path: str, session_id_hex: str, license_b64: str) -> D
 
     keys: List[Dict[str, str]] = []
     for key in cdm.get_keys(session_id):
-        keys.append({
-            "kid": key.kid.hex(),
-            "key": key.key.hex(),
-            "type": str(key.type),
-        })
+        kid_val = getattr(key, "kid", None)
+        if isinstance(kid_val, UUID):
+            kid_str = kid_val.hex
+        elif hasattr(kid_val, "hex") and callable(kid_val.hex):
+            kid_str = kid_val.hex()
+        else:
+            kid_str = str(kid_val).replace("-", "")
 
+        key_val = getattr(key, "key", None)
+        if hasattr(key_val, "hex") and callable(key_val.hex):
+            key_str = key_val.hex()
+        else:
+            key_str = str(key_val).replace("-", "")
+
+        key_type = getattr(key, "type", getattr(key, "type_", "CONTENT"))
+
+        keys.append({
+            "kid": kid_str.lower(),
+            "key": key_str.lower(),
+            "type": str(key_type),
+        })
     # Close session once parsed
     try:
         cdm.close(session_id)

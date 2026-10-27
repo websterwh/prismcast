@@ -661,13 +661,16 @@ export async function createPageWithCapture(options: CreatePageWithCaptureOption
 
   let emeInterceptor: Nullable<EmeInterceptorHandle> = null;
 
-  try {
+  if(!options.skipManifestInterception && (options.profile.channelSelection.strategy !== "youtubeGrid")) {
 
-    emeInterceptor = await installEmeInterceptor(page);
-    resources.use(emeInterceptor);
-  } catch(error) {
+    try {
 
-    LOG.debug("streaming:setup", "Failed to install EME interceptor for %s: %s.", streamId, String(error));
+      emeInterceptor = await installEmeInterceptor(page);
+      resources.use(emeInterceptor);
+    } catch(error) {
+
+      LOG.debug("streaming:setup", "Failed to install EME interceptor for %s: %s.", streamId, String(error));
+    }
   }
   // The capture's Matroska MIME type carries the codec decision, which is the codec module's: it weighs the user's allowlist against the GPU's hardware encoders.
   const captureMimeType = getCaptureMimeType();

@@ -39,7 +39,30 @@ const emptyDiscoveryGuard = createEmptyDiscoveryGuard("YouTube TV");
 // their local call letters as the channelSelector.
 const CHANNEL_ALTERNATES: Record<string, string[]> = {
 
-  "cw": ["WGN"],
+  "abc": [
+    "KOMO", "KOMO 4", "KABC", "WABC", "WLS", "WPVI", "KGO", "KTRK", "WTVD", "KFSN",
+    "WCVB", "WSB", "WJLA", "WFAA", "KMGH", "KNXV", "WXYZ", "KSTP", "WPLG", "WFTV",
+    "WEWS", "KXTV", "KATU", "KDNL", "WTAE", "WMAR", "WKRN", "WRTV", "KGTV", "KTVX"
+  ],
+  "cbs": [
+    "KIRO", "KIRO 7", "KCBS", "WCBS", "WBBM", "KYW", "KPIX", "KTVT", "WUSA", "WWJ",
+    "WANF", "KHOU", "WBZ", "KPHO", "WTSP", "WCCO", "WFOR", "KCNC", "WKMG", "WOIO",
+    "KOVR", "KOIN", "KMOV", "KDKA", "WTTV", "WJZ", "WTVF", "KFMB", "KUTV", "KCTV"
+  ],
+  "cw": [
+    "WGN", "Seattle 11", "KSTW", "WPIX", "KTLA", "WCIU", "WPHL", "KDAF", "KBCW", "KPYX",
+    "WUPA", "KIAH", "WDCW", "WLVI"
+  ],
+  "fox": [
+    "KCPQ", "KCPQ 13", "KTTV", "WNYW", "WFLD", "WTXF", "KTVU", "KDFW", "WTTG", "WJBK",
+    "WAGA", "KRIV", "WFXT", "KSAZ", "WTVT", "KMSP", "WSVN", "KDVR", "WOFL", "WJW",
+    "KTXL", "KPTV", "KTVI", "WPGH", "WXIN", "WBFF", "WZTV", "KSWB", "KSTU", "WDAF"
+  ],
+  "nbc": [
+    "KING", "KING 5", "KNBC", "WNBC", "WMAQ", "WCAU", "KNTV", "KXAS", "WRC", "WDIV",
+    "WXIA", "KPRC", "WBTS", "KPNX", "WFLA", "KARE", "WTVJ", "KUSA", "WESH", "WKYC",
+    "KCRA", "KGW", "KSDK", "WPXI", "WTHR", "WBAL", "WSMV", "KNSD", "KSL", "KSHB"
+  ],
   "pbs": [
     "Cascade PBS", "GBH", "KAET", "KBTC", "KCET", "KCTS", "KERA", "KLCS", "KOCE", "KPBS", "KQED", "KRMA", "KUHT", "KVIE", "Lakeshore PBS", "MPT", "NJ PBS",
     "THIRTEEN", "TPT", "WETA", "WGBH", "WHYY", "WLIW", "WNED", "WNET", "WNIT", "WPBA", "WPBT", "WTTW", "WTVS", "WXEL"
@@ -212,7 +235,8 @@ function addRawChannelToCache(ch: RawYttvChannel, alternateToNetwork: Map<string
     entry.channelSelector = entry.affiliate;
   } else {
 
-    const altNetwork = alternateToNetwork.get(ch.name.toLowerCase());
+    const altNetwork = alternateToNetwork.get(ch.name.toLowerCase()) ??
+      (prefixMatch ? alternateToNetwork.get(prefixMatch.toLowerCase()) : undefined);
 
     if(altNetwork) {
 
@@ -221,7 +245,15 @@ function addRawChannelToCache(ch: RawYttvChannel, alternateToNetwork: Map<string
     }
   }
 
-  yttvCache.map.set(ch.name.toLowerCase(), { discovered: entry, watchUrl: YOUTUBE_TV_BASE_URL + "/" + ch.watchPath });
+  const watchUrl = YOUTUBE_TV_BASE_URL + "/" + ch.watchPath;
+  const cacheEntry = { discovered: entry, watchUrl };
+
+  yttvCache.map.set(ch.name.toLowerCase(), cacheEntry);
+
+  if(entry.affiliate) {
+
+    yttvCache.map.set(entry.affiliate.toLowerCase(), cacheEntry);
+  }
 }
 
 /**
@@ -237,7 +269,7 @@ async function scrollAndDiscoverGuideChannels(
 ): Promise<{ allChannels: RawYttvChannel[]; completedWalk: boolean; matchedWatchUrl: Nullable<string> }> {
 
   const collected = new Map<string, RawYttvChannel>();
-  const alternateToNetwork = targetChannel ? buildAlternateToNetworkMap() : null;
+  const alternateToNetwork = buildAlternateToNetworkMap();
   const startTime = systemClock.now();
   let consecutiveNoNewChannels = 0;
   let completed = false;
@@ -319,10 +351,7 @@ async function scrollAndDiscoverGuideChannels(
 
         collected.set(ch.name.toLowerCase(), ch);
 
-        if(alternateToNetwork) {
-
-          addRawChannelToCache(ch, alternateToNetwork);
-        }
+        addRawChannelToCache(ch, alternateToNetwork);
       }
 
       const matched = targetChannel ? findWatchUrl(targetChannel) : null;
@@ -336,11 +365,7 @@ async function scrollAndDiscoverGuideChannels(
     for(const ch of channels) {
 
       collected.set(ch.name.toLowerCase(), ch);
-
-      if(alternateToNetwork) {
-
-        addRawChannelToCache(ch, alternateToNetwork);
-      }
+      addRawChannelToCache(ch, alternateToNetwork);
     }
 
     if(collected.size === prevCount) {

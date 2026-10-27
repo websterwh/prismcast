@@ -434,4 +434,60 @@ describe("virtualized guide scrolling and early exit", () => {
     assert.equal(stepIndex, 2, "stopped at step 2 when NBC 5 affiliate was matched");
     assert.deepEqual(navigations, ["https://tv.youtube.com/watch/nbc5"], "navigates to the affiliate watch URL");
   });
+  test("matches callsign affiliate names like KOMO 4 to ABC during early exit", async () => {
+
+    const navigations: string[] = [];
+    const steps = [
+      {
+
+        channels: [{ name: "Channel A", watchPath: "watch/a" }],
+        clientHeight: 500,
+        newScrollTop: 250,
+        oldScrollTop: 0,
+        scrollHeight: 1000
+      },
+      {
+
+        channels: [{ name: "KOMO 4", watchPath: "watch/komo4" }],
+        clientHeight: 500,
+        newScrollTop: 500,
+        oldScrollTop: 250,
+        scrollHeight: 1000
+      },
+      {
+
+        channels: [{ name: "Channel C", watchPath: "watch/c" }],
+        clientHeight: 500,
+        newScrollTop: 500,
+        oldScrollTop: 500,
+        scrollHeight: 1000
+      }
+    ];
+
+    let stepIndex = 0;
+    const page = {
+
+      evaluate: async (): Promise<unknown> => {
+
+        const current = steps[Math.min(stepIndex, steps.length - 1)];
+
+        stepIndex++;
+
+        return current;
+      },
+      goto: async (url: string): Promise<null> => {
+
+        navigations.push(url);
+
+        return null;
+      },
+      waitForSelector: async (): Promise<null> => null
+    } as unknown as Page;
+
+    const result = await yttvProvider.strategy.execute(page, makeYttvProfile("ABC"));
+
+    assert.equal(result.success, true);
+    assert.equal(stepIndex, 2, "stopped at step 2 when KOMO 4 affiliate was matched for ABC");
+    assert.deepEqual(navigations, ["https://tv.youtube.com/watch/komo4"], "navigates to the KOMO 4 watch URL");
+  });
 });

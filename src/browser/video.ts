@@ -84,6 +84,12 @@ export async function injectVideoSelector(page: Page): Promise<void> {
 
       if(type === "selectReadyVideo") {
 
+        if((window as unknown as Record<string, boolean>)["__prismcast_keys_acquired"]) {
+
+          return Array.from(document.querySelectorAll("video")).find((v) => (v.videoWidth > 0) || Boolean(v.src) || Boolean(v.currentSrc)) ??
+            document.querySelector("video");
+        }
+
         return Array.from(document.querySelectorAll("video")).find((v) => v.readyState >= 3) ?? null;
       }
 
@@ -372,7 +378,7 @@ export async function checkVideoPresence(context: Frame | Page, selectorType: Vi
 
     if(type === "selectReadyVideo") {
 
-      readyVideoFound = videos.some((v) => v.readyState >= 3);
+      readyVideoFound = ((window as unknown as Record<string, boolean>)["__prismcast_keys_acquired"] === true) || videos.some((v) => v.readyState >= 3);
     } else {
 
       // For selectFirstVideo, any video counts as ready.
@@ -643,6 +649,11 @@ export async function waitForVideoReady(context: Frame | Page, profile: Resolved
       await context.waitForFunction(
         (): boolean => {
 
+          if((window as unknown as Record<string, boolean>)["__prismcast_keys_acquired"]) {
+
+            return true;
+          }
+
           const videos = document.querySelectorAll("video");
 
           return Array.from(videos).some((v) => {
@@ -658,9 +669,14 @@ export async function waitForVideoReady(context: Frame | Page, profile: Resolved
       await context.waitForFunction(
         (): boolean => {
 
+          if((window as unknown as Record<string, boolean>)["__prismcast_keys_acquired"]) {
+
+            return true;
+          }
+
           const video = document.querySelector("video");
 
-          return !!video && (video.readyState >= 3);
+          return Boolean(video && (video.readyState >= 3));
         },
         { signal, timeout }
       );

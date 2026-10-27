@@ -61,6 +61,7 @@ const EME_HOOK_SCRIPT = [
   "                get: () => newBuf.buffer",
   "              });",
   "            }",
+  "              window.__prismcast_keys_acquired = true;",
   "          }",
   "        } catch (err) {",
   "          console.warn(\"[Prismcast EME] Challenge resign error:\", err);",
@@ -81,6 +82,7 @@ const EME_HOOK_SCRIPT = [
   "          }",
   "          window.__prismcast_on_license(sessionId, btoa(b64));",
   "        }",
+  "          window.__prismcast_keys_acquired = true;",
   "      } catch (err) {",
   "        console.warn(\"[Prismcast EME] License capture error:\", err);",
   "      }",
@@ -124,6 +126,11 @@ export async function installEmeInterceptor(
 
       onKeys?.(newKeys);
       const current = Array.from(acquiredKeys.values());
+
+      void page.evaluate((): void => {
+
+        (window as unknown as Record<string, boolean>)["__prismcast_keys_acquired"] = true;
+      }).catch(() => { /* Ignore navigation */ });
       const waiters = keyWaiters;
 
       keyWaiters = [];

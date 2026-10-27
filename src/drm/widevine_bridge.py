@@ -80,11 +80,10 @@ def cmd_build_challenge(wvd_path: str, pssh_b64: str) -> Dict[str, Any]:
 
     session_id = cdm.open()
     session_id_hex = session_id.hex()
+    challenge = cdm.get_license_challenge(session_id, pssh)
     session_obj = getattr(cdm, "_Cdm__sessions")[session_id]
     _CDM_SESSIONS[session_id_hex] = (cdm, session_id)
     _save_session(session_id, session_obj)
-
-    challenge = cdm.get_license_challenge(session_id, pssh)
     return {
         "session_id": session_id_hex,
         "challenge_b64": base64.b64encode(challenge).decode("ascii"),
@@ -112,10 +111,10 @@ def cmd_resign_challenge(wvd_path: str, challenge_b64: str) -> Dict[str, Any]:
 
     session_id = cdm.open()
     session_id_hex = session_id.hex()
+    new_challenge = cdm.get_license_challenge(session_id, pssh)
     session_obj = getattr(cdm, "_Cdm__sessions")[session_id]
     _CDM_SESSIONS[session_id_hex] = (cdm, session_id)
     _save_session(session_id, session_obj)
-    new_challenge = cdm.get_license_challenge(session_id, pssh)
     return {
         "session_id": session_id_hex,
         "challenge_b64": base64.b64encode(new_challenge).decode("ascii"),

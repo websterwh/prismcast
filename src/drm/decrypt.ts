@@ -3,12 +3,13 @@
  * decrypt.ts: fMP4 segment decryption using Bento4 mp4decrypt.
  */
 
+import type { DrmContext, DrmKey } from "./types.ts";
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { DrmContext, DrmKey } from "./types.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -31,14 +32,9 @@ export async function resolveMp4DecryptBin(ctx?: DrmContext): Promise<string> {
 
   for(const candidate of DEFAULT_MP4DECRYPT_CANDIDATES) {
 
-    try {
-
-      await fs.access(candidate, fs.constants.X_OK);
+    if(existsSync(candidate)) {
 
       return candidate;
-    } catch {
-
-      // Continue searching
     }
   }
 
@@ -63,7 +59,7 @@ function buildKeyArgs(keys: readonly DrmKey[]): string[] {
     const cleanKid = k.kid.replaceAll("-", "").toLowerCase();
     const cleanKey = k.key.replaceAll("-", "").toLowerCase();
 
-    args.push("--key", `${cleanKid}:${cleanKey}`);
+    args.push("--key", cleanKid + ":" + cleanKey);
   }
 
   return args;

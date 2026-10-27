@@ -8,11 +8,11 @@
  */
 import type { AttemptNativeStreamingOptions, RefreshedFeedMetadata } from "./index.ts";
 import { TestClock, waitUntil } from "homebridge-plugin-utils/testing";
-import type { DrmKey } from "../drm/types.ts";
-import type { EmeInterceptorHandle } from "../browser/emeInterceptor.ts";
 import { afterEach, beforeEach, describe, mock, test } from "node:test";
 import { buildProbeCacheStamp, clearProbeCache } from "./probe.ts";
 import { closePuppeteerStreamWssOnIdle, noop } from "../testing.helpers.ts";
+import type { DrmKey } from "../drm/types.ts";
+import type { EmeInterceptorHandle } from "../browser/emeInterceptor.ts";
 import type { Page } from "puppeteer-core";
 import assert from "node:assert/strict";
 import { attemptNativeStreaming } from "./index.ts";
@@ -196,17 +196,26 @@ describe("attemptNativeStreaming", () => {
     const variantUrl = "https://cdn.test/drm-eme-variant.m3u8";
 
     makeFetchRouter({
+
       [masterUrl]: () => new Response("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000\ndrm-eme-variant.m3u8\n", { status: 200 }),
-      [variantUrl]: () => new Response("#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES-CTR,KEYFORMAT=\"urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed\",URI=\"data:text/plain;base64,...\"\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:6,\nseg0.m4s\n#EXTINF:6,\nseg1.m4s\n", { status: 200 })
+      [variantUrl]: () => new Response(
+        "#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES-CTR,KEYFORMAT=\"urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed\"" +
+        ",URI=\"data:...\"\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:6,\nseg0.m4s\n#EXTINF:6,\nseg1.m4s\n",
+        { status: 200 }
+      )
     });
 
     const mockEmeInterceptor: EmeInterceptorHandle = {
+
       acquiredKeys: new Map(),
-      waitForKeys: async (): Promise<DrmKey[]> => [{ key: "000102030405060708090a0b0c0d0e0f", kid: "100102030405060708090a0b0c0d0e0f", type: "CONTENT" }],
-      [Symbol.dispose]: noop
+      [Symbol.dispose]: noop,
+      waitForKeys: async (): Promise<DrmKey[]> => [
+        { key: "000102030405060708090a0b0c0d0e0f", kid: "100102030405060708090a0b0c0d0e0f", type: "CONTENT" }
+      ]
     };
 
     const options = makeAttemptOptions({
+
       channelName: "drm-eme-test",
       emeInterceptor: mockEmeInterceptor,
       interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
@@ -227,20 +236,23 @@ describe("attemptNativeStreaming", () => {
     const variantUrl = "https://cdn.test/drm-timeout-variant.m3u8";
 
     makeFetchRouter({
+
       [masterUrl]: () => new Response("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000\ndrm-timeout-variant.m3u8\n", { status: 200 }),
       [variantUrl]: () => new Response("#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"skd://x\"\n#EXTINF:6,\nseg0.ts\n#EXTINF:6,\nseg1.ts\n", { status: 200 })
     });
 
     const mockEmeInterceptor: EmeInterceptorHandle = {
+
       acquiredKeys: new Map(),
+      [Symbol.dispose]: noop,
       waitForKeys: async (): Promise<DrmKey[]> => {
 
         throw new Error("Timed out waiting for DRM keys");
-      },
-      [Symbol.dispose]: noop
+      }
     };
 
     const options = makeAttemptOptions({
+
       channelName: "drm-timeout-test",
       emeInterceptor: mockEmeInterceptor,
       interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })

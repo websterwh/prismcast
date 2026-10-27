@@ -143,6 +143,8 @@ RUN (npm ci || npm install) \
     && npm run build \
     && npm pack \
     && npm install -g prismcast-*.tgz \
+    && (mkdir -p /usr/lib/node_modules/prismcast/dist/drm && cp src/drm/widevine_bridge.py /usr/lib/node_modules/prismcast/dist/drm/widevine_bridge.py && chmod +x /usr/lib/node_modules/prismcast/dist/drm/widevine_bridge.py || true) \
+    && (mkdir -p /usr/local/lib/node_modules/prismcast/dist/drm && cp src/drm/widevine_bridge.py /usr/local/lib/node_modules/prismcast/dist/drm/widevine_bridge.py && chmod +x /usr/local/lib/node_modules/prismcast/dist/drm/widevine_bridge.py || true) \
     && cd / \
     && rm -rf /app
 # Create a Chrome wrapper script that passes --no-sandbox for container environments and enables Intel VA-API hardware video encoding.

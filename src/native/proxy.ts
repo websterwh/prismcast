@@ -10,10 +10,10 @@ import { decryptSegment, deriveIvFromSequence, fetchDecryptionKey, parseExplicit
 import { findNamedInitSegment, pruneNamedInitSegments, storeAudioSegment, storeNamedInitSegment, storeSegment, updateAudioPlaylist, updatePlaylist,
   updateVideoPlaylist } from "../streaming/hlsSegments.ts";
 import { CAPTURE_BASELINE_CODEC } from "../types/index.ts";
-import type { DrmKey } from "../drm/types.ts";
 import { CONFIG } from "../config/index.ts";
 import type { CaptureCodec } from "../streaming/codec.ts";
 import type { Clock } from "homebridge-plugin-utils";
+import type { DrmKey } from "../drm/types.ts";
 import type { InitSegmentTrack } from "../streaming/registry.ts";
 import type { PipelineShape } from "./probe.ts";
 import type { PlaylistSegmentEntry } from "../streaming/playlistBuilder.ts";
@@ -1045,10 +1045,6 @@ async function resolveTrackInit(options: { ctx: ProxyContext; fetchSegment: Segm
       return;
     }
   }
-  if(ctx.lifecycle.stopped) {
-
-    return;
-  }
 
   const existingName = findNamedInitSegment(ctx.streamId, track, data);
   let servedName = existingName;
@@ -1674,8 +1670,8 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
     lastSegmentTime: 0,
     lastTargetDuration: 6,
     lastUpstreamMapUri: null,
-    rawEncInit: null,
     metadata: createSegmentMetadata(),
+    rawEncInit: null,
     segmentIndex: prerollSegmentCount,
     segmentTracker: { consecutiveFailures: 0, debugLabel: "Segment", label: "segment" },
     tokenRefreshPending: false,
@@ -1692,8 +1688,8 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
     initCounter: 0,
     lastTargetDuration: 6,
     lastUpstreamMapUri: null,
-    rawEncInit: null,
     metadata: createSegmentMetadata(),
+    rawEncInit: null,
     segmentIndex: 0,
     segmentTracker: { consecutiveFailures: 0, debugLabel: "Audio segment", label: "audio segment" },
     tokenRefreshPending: false,
@@ -2114,6 +2110,7 @@ export function createNativeProxy(options: NativeProxyOptions): NativeProxy {
 
       data = decryptSegment(data, key, ivResult.iv);
     }
+
     if(ctx.drmKeys && (ctx.drmKeys.length > 0) && rawEncInit) {
 
       try {

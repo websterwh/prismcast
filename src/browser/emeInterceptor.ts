@@ -3,9 +3,9 @@
  * emeInterceptor.ts: In-browser Encrypted Media Extensions (EME) hook for Widevine key extraction.
  */
 
-import type { Clock } from "homebridge-plugin-utils";
 import type { DrmContext, DrmKey } from "../drm/types.ts";
 import { parseLicense, resignChallenge } from "../drm/widevine.ts";
+import type { Clock } from "homebridge-plugin-utils";
 import { LOG } from "../utils/index.ts";
 import type { Page } from "puppeteer-core";
 import { systemClock } from "homebridge-plugin-utils";
@@ -25,83 +25,74 @@ export interface EmeInterceptorHandle extends Disposable {
  * Injected script string evaluated before any page script runs.
  * Intercepts MediaKeySession message (challenge) and update (license) events.
  */
-const EME_HOOK_SCRIPT = `(() => {
-  if (typeof window === "undefined" || window.__prismcast_eme_installed) return;
-  window.__prismcast_eme_installed = true;
-
-  const sessionMap = new WeakMap();
-
-  if (typeof MediaKeySession !== "undefined") {
-    const originalAddEventListener = MediaKeySession.prototype.addEventListener;
-    MediaKeySession.prototype.addEventListener = function(type, listener, options) {
-      if (type !== "message") {
-        return originalAddEventListener.call(this, type, listener, options);
-      }
-
-      const wrappedListener = async (event) => {
-        if (!event || !event.message || event.message.byteLength <= 2) {
-          return typeof listener === "function" ? listener.call(this, event) : listener.handleEvent(event);
-        }
-
-        try {
-          const rawBytes = new Uint8Array(event.message);
-          let b64 = "";
-          for (let i = 0; i < rawBytes.length; i++) {
-            b64 += String.fromCharCode(rawBytes[i]);
-          }
-          const challengeB64 = btoa(b64);
-
-          if (window.__prismcast_resign_challenge) {
-            const resignRes = await window.__prismcast_resign_challenge(challengeB64);
-            if (resignRes && resignRes.challengeB64) {
-              const binStr = atob(resignRes.challengeB64);
-              const newBuf = new Uint8Array(binStr.length);
-              for (let i = 0; i < binStr.length; i++) {
-                newBuf[i] = binStr.charCodeAt(i);
-              }
-
-              sessionMap.set(this, resignRes.sessionId);
-
-              Object.defineProperty(event, "message", {
-                configurable: true,
-                get: () => newBuf.buffer
-              });
-            }
-          }
-        } catch (err) {
-          console.warn("[Prismcast EME] Challenge resign error:", err);
-        }
-
-        return typeof listener === "function" ? listener.call(this, event) : listener.handleEvent(event);
-      };
-
-      return originalAddEventListener.call(this, type, wrappedListener, options);
-    };
-
-    const originalUpdate = MediaKeySession.prototype.update;
-    MediaKeySession.prototype.update = async function(response) {
-      try {
-        const sessionId = sessionMap.get(this);
-        if (sessionId && response && window.__prismcast_on_license) {
-          const rawBytes = new Uint8Array(response);
-          let b64 = "";
-          for (let i = 0; i < rawBytes.length; i++) {
-            b64 += String.fromCharCode(rawBytes[i]);
-          }
-          window.__prismcast_on_license(sessionId, btoa(b64));
-        }
-      } catch (err) {
-        console.warn("[Prismcast EME] License capture error:", err);
-      }
-
-      try {
-        return await originalUpdate.call(this, response);
-      } catch (e) {
-        // Ignored: expected to fail on browser CDM since license was encrypted for our WVD
-      }
-    };
-  }
-})();`;
+const EME_HOOK_SCRIPT = [
+  "(() => {",
+  "  if (typeof window === \"undefined\" || window.__prismcast_eme_installed) return;",
+  "  window.__prismcast_eme_installed = true;",
+  "  const sessionMap = new WeakMap();",
+  "  if (typeof MediaKeySession !== \"undefined\") {",
+  "    const originalAddEventListener = MediaKeySession.prototype.addEventListener;",
+  "    MediaKeySession.prototype.addEventListener = function(type, listener, options) {",
+  "      if (type !== \"message\") {",
+  "        return originalAddEventListener.call(this, type, listener, options);",
+  "      }",
+  "      const wrappedListener = async (event) => {",
+  "        if (!event || !event.message || event.message.byteLength <= 2) {",
+  "          return typeof listener === \"function\" ? listener.call(this, event) : listener.handleEvent(event);",
+  "        }",
+  "        try {",
+  "          const rawBytes = new Uint8Array(event.message);",
+  "          let b64 = \"\";",
+  "          for (let i = 0; i < rawBytes.length; i++) {",
+  "            b64 += String.fromCharCode(rawBytes[i]);",
+  "          }",
+  "          const challengeB64 = btoa(b64);",
+  "          if (window.__prismcast_resign_challenge) {",
+  "            const resignRes = await window.__prismcast_resign_challenge(challengeB64);",
+  "            if (resignRes && resignRes.challengeB64) {",
+  "              const binStr = atob(resignRes.challengeB64);",
+  "              const newBuf = new Uint8Array(binStr.length);",
+  "              for (let i = 0; i < binStr.length; i++) {",
+  "                newBuf[i] = binStr.charCodeAt(i);",
+  "              }",
+  "              sessionMap.set(this, resignRes.sessionId);",
+  "              Object.defineProperty(event, \"message\", {",
+  "                configurable: true,",
+  "                get: () => newBuf.buffer",
+  "              });",
+  "            }",
+  "          }",
+  "        } catch (err) {",
+  "          console.warn(\"[Prismcast EME] Challenge resign error:\", err);",
+  "        }",
+  "        return typeof listener === \"function\" ? listener.call(this, event) : listener.handleEvent(event);",
+  "      };",
+  "      return originalAddEventListener.call(this, type, wrappedListener, options);",
+  "    };",
+  "    const originalUpdate = MediaKeySession.prototype.update;",
+  "    MediaKeySession.prototype.update = async function(response) {",
+  "      try {",
+  "        const sessionId = sessionMap.get(this);",
+  "        if (sessionId && response && window.__prismcast_on_license) {",
+  "          const rawBytes = new Uint8Array(response);",
+  "          let b64 = \"\";",
+  "          for (let i = 0; i < rawBytes.length; i++) {",
+  "            b64 += String.fromCharCode(rawBytes[i]);",
+  "          }",
+  "          window.__prismcast_on_license(sessionId, btoa(b64));",
+  "        }",
+  "      } catch (err) {",
+  "        console.warn(\"[Prismcast EME] License capture error:\", err);",
+  "      }",
+  "      try {",
+  "        return await originalUpdate.call(this, response);",
+  "      } catch (e) {",
+  "        // Ignored: expected to fail on browser CDM since license was encrypted for our WVD",
+  "      }",
+  "    };",
+  "  }",
+  "})();"
+].join("\n");
 
 /**
  * Installs an EME hook on the given page to intercept Widevine license challenges and responses.
@@ -195,7 +186,7 @@ export async function installEmeInterceptor(
   return {
 
     acquiredKeys,
-    [Symbol.dispose]() {
+    [Symbol.dispose](): void {
 
       keyWaiters = [];
     },

@@ -3,19 +3,19 @@
  * emeInterceptor.test.ts: Tests for the in-browser EME Widevine interceptor.
  */
 
-import assert from "node:assert/strict";
-import test from "node:test";
-import { installEmeInterceptor } from "./emeInterceptor.ts";
 import type { Page } from "puppeteer-core";
+import assert from "node:assert/strict";
+import { installEmeInterceptor } from "./emeInterceptor.ts";
+import test from "node:test";
 
 // Mock minimal Page implementation for unit tests
 function createMockPage(): {
-  exposedFunctions: Map<string, (...args: any[]) => Promise<any>>;
+  exposedFunctions: Map<string, (...args: unknown[]) => Promise<unknown>>;
   injectedScripts: string[];
   page: Page;
 } {
 
-  const exposedFunctions = new Map<string, (...args: any[]) => Promise<any>>();
+  const exposedFunctions = new Map<string, (...args: unknown[]) => Promise<unknown>>();
   const injectedScripts: string[] = [];
 
   const page = {
@@ -24,7 +24,7 @@ function createMockPage(): {
 
       injectedScripts.push(script);
     },
-    exposeFunction: async (name: string, fn: (...args: any[]) => Promise<any>) => {
+    exposeFunction: async (name: string, fn: (...args: unknown[]) => Promise<unknown>) => {
 
       exposedFunctions.set(name, fn);
     }

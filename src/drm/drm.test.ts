@@ -3,13 +3,6 @@
  * drm.test.ts: Tests for the Prismcast Widevine CDM and segment decryption subsystem.
  */
 
-import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import test from "node:test";
-import { promisify } from "node:util";
 import {
   DEFAULT_WVD_PATH,
   buildChallenge,
@@ -18,6 +11,13 @@ import {
   getDeviceInfo,
   resignChallenge
 } from "./index.ts";
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+import test from "node:test";
 
 const execFileAsync = promisify(execFile);
 
@@ -75,9 +75,9 @@ async function createEncryptedFixture(
   // 2) Encrypt with shaka-packager
   await execFileAsync(packagerBin, [
     "--quiet",
-    `in=${srcPath},stream=video,init_segment=${initPath},segment_template=${segPattern}`,
+    "in=" + srcPath + ",stream=video,init_segment=" + initPath + ",segment_template=" + segPattern,
     "--enable_raw_key_encryption",
-    `--keys=key_id=${TEST_KID}:key=${TEST_KEY}`,
+    "--keys=key_id=" + TEST_KID + ":key=" + TEST_KEY,
     "--segment_duration=2"
   ]);
 
@@ -135,13 +135,13 @@ test("Widevine CDM: License Challenge Generation", async (t) => {
       "/home/william/Documents/projects/unshackle/.venv/bin/python";
     const { stdout } = await execFileAsync(pythonBin, [
       "-c",
-      `
-import base64
-from uuid import UUID
-from pywidevine.pssh import PSSH
-p = PSSH.new(system_id=UUID("edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"), key_ids=["${TEST_KID}"])
-print(base64.b64encode(p.dump()).decode('ascii'))
-`
+      [
+        "import base64",
+        "from uuid import UUID",
+        "from pywidevine.pssh import PSSH",
+        "p = PSSH.new(system_id=UUID(\"edef8ba9-79d6-4ace-a3c8-27dcd51d21ed\"), key_ids=[\"" + TEST_KID + "\"])",
+        "print(base64.b64encode(p.dump()).decode('ascii'))"
+      ].join("\n")
     ]);
 
     const psshB64 = stdout.trim();
@@ -160,13 +160,13 @@ print(base64.b64encode(p.dump()).decode('ascii'))
       "/home/william/Documents/projects/unshackle/.venv/bin/python";
     const { stdout } = await execFileAsync(pythonBin, [
       "-c",
-      `
-import base64
-from uuid import UUID
-from pywidevine.pssh import PSSH
-p = PSSH.new(system_id=UUID("edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"), key_ids=["${TEST_KID}"])
-print(base64.b64encode(p.dump()).decode('ascii'))
-`
+      [
+        "import base64",
+        "from uuid import UUID",
+        "from pywidevine.pssh import PSSH",
+        "p = PSSH.new(system_id=UUID(\"edef8ba9-79d6-4ace-a3c8-27dcd51d21ed\"), key_ids=[\"" + TEST_KID + "\"])",
+        "print(base64.b64encode(p.dump()).decode('ascii'))"
+      ].join("\n")
     ]);
 
     const initialChallenge = await buildChallenge(stdout.trim());

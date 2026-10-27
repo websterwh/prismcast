@@ -3,13 +3,13 @@
  * widevine.ts: Widevine CDM client using the Python sidecar bridge.
  */
 
-import { execFile } from "node:child_process";
-import fs from "node:fs/promises";
-import { existsSync, readdirSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+/* eslint-disable camelcase */
 import type { DrmContext, DrmKey, WidevineChallenge, WidevineDeviceInfo } from "./types.ts";
-
+import { existsSync, readdirSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import fs from "node:fs/promises";
+import path from "node:path";
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 /** Well-known fallback candidate paths for the python interpreter with pywidevine. */
@@ -47,6 +47,38 @@ const DEFAULT_WVD_DIRECTORIES = [
 export const DEFAULT_BRIDGE_PATH = path.join(currentDir, "widevine_bridge.py");
 
 /**
+ * Resolves the path to the widevine_bridge.py script across source, dist, and global npm installs.
+ */
+export function resolveBridgePath(ctx?: DrmContext): string {
+
+  if(ctx?.widevineBridgePath) {
+
+    return ctx.widevineBridgePath;
+  }
+
+  const candidates = [
+    path.join(currentDir, "widevine_bridge.py"),
+    path.resolve(currentDir, "../../src/drm/widevine_bridge.py"),
+    path.resolve(currentDir, "../src/drm/widevine_bridge.py"),
+    "/usr/lib/node_modules/prismcast/dist/drm/widevine_bridge.py",
+    "/usr/local/lib/node_modules/prismcast/dist/drm/widevine_bridge.py",
+    "/usr/lib/node_modules/prismcast/src/drm/widevine_bridge.py",
+    "/app/src/drm/widevine_bridge.py",
+    DEFAULT_BRIDGE_PATH
+  ];
+
+  for(const candidate of candidates) {
+
+    if(existsSync(candidate)) {
+
+      return candidate;
+    }
+  }
+
+  return DEFAULT_BRIDGE_PATH;
+}
+
+/**
  * Resolves the Python executable path.
  */
 export async function resolvePythonBin(ctx?: DrmContext): Promise<string> {
@@ -58,14 +90,9 @@ export async function resolvePythonBin(ctx?: DrmContext): Promise<string> {
 
   for(const candidate of DEFAULT_PYTHON_CANDIDATES) {
 
-    try {
-
-      await fs.access(candidate, fs.constants.X_OK);
+    if(existsSync(candidate)) {
 
       return candidate;
-    } catch {
-
-      // Continue searching
     }
   }
 
@@ -153,7 +180,7 @@ async function callBridge<T>(
 ): Promise<T> {
 
   const pythonBin = await resolvePythonBin(ctx);
-  const bridgeScript = ctx?.widevineBridgePath || DEFAULT_BRIDGE_PATH;
+  const bridgeScript = resolveBridgePath(ctx);
 
   return new Promise<T>((resolve, reject) => {
 
@@ -165,7 +192,7 @@ async function callBridge<T>(
 
         if(error) {
 
-          reject(new Error(`Bridge execution failed: ${error.message}${stderr ? ` (${stderr.trim()})` : ""}`));
+          reject(new Error("Bridge execution failed: " + error.message + (stderr ? " (" + stderr.trim() + ")" : "")));
 
           return;
         }
@@ -176,14 +203,14 @@ async function callBridge<T>(
 
           if(resp.status !== "ok") {
 
-            reject(new Error(resp.error || "Unknown bridge failure"));
+            reject(new Error(resp.error ?? "Unknown bridge failure"));
 
             return;
           }
           resolve(resp.result as T);
         } catch(parseError) {
 
-          reject(new Error(`Failed to parse bridge output: ${String(parseError)} | raw: ${stdout}`));
+          reject(new Error("Failed to parse bridge output: " + String(parseError) + " | raw: " + stdout));
         }
       }
     );
@@ -267,6 +294,7 @@ export async function resignChallenge(
   const challengeB64 = Buffer.isBuffer(challenge) ? challenge.toString("base64") : challenge;
 
   interface RawResignResult {
+
     challenge_b64: string;
     challenge_bytes: number;
     session_id: string;
@@ -278,6 +306,7 @@ export async function resignChallenge(
   );
 
   return {
+
     challenge: Buffer.from(raw.challenge_b64, "base64"),
     sessionId: raw.session_id
   };

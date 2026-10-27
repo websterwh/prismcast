@@ -55,7 +55,7 @@
   },
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && mkdir -p dist/drm && cp src/drm/widevine_bridge.py dist/drm/widevine_bridge.py",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
     "dev": "scripts/dev-prismcast.sh",
     "lint": "eslint --max-warnings=${ESLINT_MAX_WARNINGS:-\"-1\"} eslint.config.mjs src test",

@@ -10,9 +10,6 @@ import { CAPTURE_SOURCE_UNAVAILABLE_MESSAGE, isChannelSelectionProfile } from ".
 import { CaptureAbandonedError, CaptureTurnTimeoutError, createCaptureLock } from "./captureLock.ts";
 import type { CaptureStream, CaptureStreamOptions } from "../browser/index.ts";
 import { FINALIZE_SETTLE_DELAY, installManifestInterceptor } from "../browser/manifestInterceptor.ts";
-import type { EmeInterceptorHandle } from "../browser/emeInterceptor.ts";
-import { installEmeInterceptor } from "../browser/emeInterceptor.ts";
-import { isDrmAvailable } from "../drm/index.ts";
 import { LOG, chromeFetch, extractDomain, formatError, getStreamContext, maxRetryDuration, registerAbortController,
   resolveFFmpegPath, retryOperation, runWithStreamContext, spawnFFmpeg, startTimer, timeoutSignal, toError, waitWithTimeout } from "../utils/index.ts";
 import type { ManifestInterceptionResult, ManifestInterceptorHandle } from "../browser/manifestInterceptor.ts";
@@ -25,6 +22,7 @@ import { initializePlayback, injectVideoSelector, muteExistingVideos, navigateTo
 import { CONFIG } from "../config/index.ts";
 import type { CaptureSession } from "./captureSession.ts";
 import type { Clock } from "homebridge-plugin-utils";
+import type { EmeInterceptorHandle } from "../browser/emeInterceptor.ts";
 import type { InitializePlaybackOptions } from "../browser/video.ts";
 import type { MonitorStreamInfo } from "./monitor.ts";
 import type { ProbeCacheIdentity } from "../native/probe.ts";
@@ -35,7 +33,9 @@ import { getCachedEncryption } from "../native/probe.ts";
 import { getCaptureMimeType } from "./codec.ts";
 import { getDomainAuthState } from "../config/health.ts";
 import { getUserProfiles } from "../config/userProfiles.ts";
+import { installEmeInterceptor } from "../browser/emeInterceptor.ts";
 import { isCaptureInfrastructureError } from "./recovery.ts";
+import { isDrmAvailable } from "../drm/index.ts";
 import { monitorPlaybackHealth } from "./monitor.ts";
 import { mutateChannels } from "../config/userChannels.ts";
 import { openSharedWindowTab } from "../browser/tabSelection.ts";

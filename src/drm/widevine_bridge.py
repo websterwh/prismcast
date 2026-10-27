@@ -168,8 +168,9 @@ def handle_request(req: Dict[str, Any]) -> Dict[str, Any]:
             return {"status": "ok", "result": cmd_parse_license(req["wvd_path"], req["session_id"], req["license_b64"])}
         return {"status": "error", "error": f"Unknown command: {cmd}"}
     except Exception as e:
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return {"status": "error", "error": f"{type(e).__name__}: {e}"}
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Prismcast Widevine CDM Bridge")
@@ -192,8 +193,9 @@ def main() -> int:
         req = json.loads(line)
         resp = handle_request(req)
         print(json.dumps(resp))
+        if resp.get("status") != "ok":
+            sys.stderr.write(f"Bridge error: {resp.get('error')}\n")
         return 0 if resp.get("status") == "ok" else 1
-
     # Default to line-delimited interactive loop over stdin
     for line in sys.stdin:
         line = line.strip()

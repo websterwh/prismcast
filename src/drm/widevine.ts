@@ -192,6 +192,21 @@ async function callBridge<T>(
 
         if(error) {
 
+          try {
+
+            const resp = JSON.parse(stdout.trim()) as BridgeResponse<T>;
+
+            if((resp.status === "error") && resp.error) {
+
+              reject(new Error("Bridge error: " + resp.error));
+
+              return;
+            }
+          } catch {
+
+            // Ignore parse failure on error exit
+          }
+
           reject(new Error("Bridge execution failed: " + error.message + (stderr ? " (" + stderr.trim() + ")" : "")));
 
           return;

@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
+    unzip \
     # Xvfb and X11 utilities (standard Xvfb installed here for deps; overridden below by custom build).
     xvfb \
     x11vnc \
@@ -117,6 +118,22 @@ RUN curl -fsSL -o /tmp/virtualgl.deb \
     https://github.com/VirtualGL/virtualgl/releases/download/3.1.5/virtualgl_3.1.5_amd64.deb \
     && apt-get update && apt-get install -y /tmp/virtualgl.deb \
     && rm -f /tmp/virtualgl.deb \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Bento4 mp4decrypt for DRM fragment decryption.
+RUN curl -fsSL -o /tmp/bento4.zip https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-641.x86_64-unknown-linux.zip \
+    && unzip -q /tmp/bento4.zip -d /tmp/bento4 \
+    && mv /tmp/bento4/Bento4-SDK-1-6-0-641.x86_64-unknown-linux/bin/mp4decrypt /usr/local/bin/mp4decrypt \
+    && chmod +x /usr/local/bin/mp4decrypt \
+    && rm -rf /tmp/bento4*
+
+# Python environment for Widevine and PlayReady DRM CDM bridge.
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && python3 -m venv /opt/prismcast-drm-venv \
+    && /opt/prismcast-drm-venv/bin/pip install --no-cache-dir pywidevine pyplayready \
     && rm -rf /var/lib/apt/lists/*
 
 # Build and install PrismCast globally from local source.

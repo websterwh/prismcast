@@ -5,6 +5,7 @@
 
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DrmContext, DrmKey, WidevineChallenge, WidevineDeviceInfo } from "./types.ts";
@@ -13,14 +14,26 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 /** Well-known fallback candidate paths for the python interpreter with pywidevine. */
 const DEFAULT_PYTHON_CANDIDATES = [
+  process.env["PRISMCAST_PYTHON_BIN"],
+  "/opt/prismcast-drm-venv/bin/python",
+  "/opt/prismcast-drm-venv/bin/python3",
   "/home/william/Documents/projects/unshackle/.venv/bin/python",
   "/home/william/Documents/projects/unshackle/.venv/bin/python3",
   "python3"
-];
+].filter((p): p is string => Boolean(p));
 
 /** Default Widevine Device file location on this host. */
 export const DEFAULT_WVD_PATH =
   "/home/william/Documents/projects/unshackle/unshackle/WVDs/google_aosp_on_ia_emulator_14.0.0_f63e4253_4464_l3.wvd";
+
+/** Candidate paths for Widevine Device (.wvd) files across bare metal and container environments. */
+const DEFAULT_WVD_CANDIDATES = [
+  process.env["PRISMCAST_WVD_PATH"],
+  "/root/.prismcast/drm/device.wvd",
+  "/root/.prismcast/device.wvd",
+  "/etc/prismcast/drm/device.wvd",
+  DEFAULT_WVD_PATH
+].filter((p): p is string => Boolean(p));
 
 /** Default bridge script path relative to this file. */
 export const DEFAULT_BRIDGE_PATH = path.join(currentDir, "widevine_bridge.py");
@@ -56,14 +69,25 @@ export async function resolvePythonBin(ctx?: DrmContext): Promise<string> {
  */
 export function resolveWvdPath(wvdPath?: string, ctx?: DrmContext): string {
 
-  const resolved = wvdPath || ctx?.wvdPath || DEFAULT_WVD_PATH;
+  if(wvdPath) {
 
-  if(!resolved) {
-
-    throw new Error("No Widevine Device (.wvd) path specified and default is unset.");
+    return wvdPath;
   }
 
-  return resolved;
+  if(ctx?.wvdPath) {
+
+    return ctx.wvdPath;
+  }
+
+  for(const candidate of DEFAULT_WVD_CANDIDATES) {
+
+    if(existsSync(candidate)) {
+
+      return candidate;
+    }
+  }
+
+  return DEFAULT_WVD_PATH;
 }
 
 /**

@@ -52,7 +52,7 @@ export async function queryYouTubeTvHlsManifest(page: Page): Promise<Nullable<Yo
   // Query InnerTube API from browser context with iOS client to get HLS manifest
   const innerTubeResult = await evaluateWithAbort(page, async (params: { videoId: string; playbackToken: string }): Promise<YouTubeTvHlsManifest | null> => {
     try {
-      const response = await fetch("https://tv.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2PgBZ8JFqX4BzN-n5uVR8o8w3ZlE", {
+      const response = await fetch("https://tv.youtube.com/youtubei/v1/player", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

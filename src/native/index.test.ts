@@ -180,7 +180,7 @@ describe("attemptNativeStreaming", () => {
     const options = makeAttemptOptions({
 
       channelName: "drm-channel-test",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("drm-channel-test");
@@ -218,7 +218,7 @@ describe("attemptNativeStreaming", () => {
 
       channelName: "drm-eme-test",
       emeInterceptor: mockEmeInterceptor,
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("drm-eme-test");
@@ -255,7 +255,7 @@ describe("attemptNativeStreaming", () => {
 
       channelName: "drm-timeout-test",
       emeInterceptor: mockEmeInterceptor,
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("drm-timeout-test");
@@ -286,7 +286,7 @@ describe("attemptNativeStreaming", () => {
     const options = makeAttemptOptions({
 
       channelName: "clear-channel-test",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("clear-channel-test");
@@ -335,7 +335,7 @@ describe("attemptNativeStreaming", () => {
     const options = makeAttemptOptions({
 
       channelName: "aes-prefetch-channel",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("aes-prefetch-channel");
@@ -368,7 +368,7 @@ describe("attemptNativeStreaming", () => {
     const options = makeAttemptOptions({
 
       channelName: "dai-channel-test",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" }),
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false }),
       mpegTsClient: true
     });
 
@@ -402,7 +402,7 @@ describe("attemptNativeStreaming", () => {
     const options = makeAttemptOptions({
 
       channelName: "dai-hls-channel",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("dai-hls-channel");
@@ -428,7 +428,7 @@ describe("attemptNativeStreaming", () => {
     const options = makeAttemptOptions({
 
       channelName: "probe-fail-channel",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("probe-fail-channel");
@@ -457,7 +457,7 @@ describe("attemptNativeStreaming", () => {
     const options = makeAttemptOptions({
 
       channelName: "onerror-channel",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" }),
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false }),
       onError: (): void => {
 
         onErrorCalls++;
@@ -552,7 +552,7 @@ describe("attemptNativeStreaming", () => {
 
       channelName: "exp-channel",
       clock,
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("exp-channel");
@@ -590,7 +590,7 @@ describe("attemptNativeStreaming", () => {
 
       channelName: "relay-channel",
       clock,
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("relay-channel");
@@ -642,7 +642,7 @@ describe("attemptNativeStreaming", () => {
     const options = makeAttemptOptions({
 
       channelName: "aes-ok-channel",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     });
 
     clearProbeCache("aes-ok-channel");
@@ -684,7 +684,7 @@ describe("attemptNativeStreaming: container hop (T21)", () => {
     const result = await attemptNativeStreaming(makeAttemptOptions({
 
       channelName: "hop-fmp4-channel",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     }));
 
     assert.ok(result, "native attempt succeeded");
@@ -712,7 +712,7 @@ describe("attemptNativeStreaming: container hop (T21)", () => {
     const result = await attemptNativeStreaming(makeAttemptOptions({
 
       channelName: "hop-ts-channel",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     }));
 
     assert.ok(result, "native attempt succeeded");
@@ -750,7 +750,7 @@ describe("attemptNativeStreaming: static-playlist tune admission", () => {
     const result = await attemptNativeStreaming(makeAttemptOptions({
 
       channelName: "bumper-channel",
-      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master" })
+      interceptionPromise: Promise.resolve({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false })
     }));
 
     assert.equal(result, null, "a bumper-shaped variant declines the native attempt so capture serves the channel");

@@ -292,6 +292,9 @@ export interface StreamSetupResult {
   // The name of the resolved profile (e.g., "keyboardDynamic", "fullscreenApi", "default").
   profileName: string;
 
+  // Direct HLS manifest URL from YouTube TV InnerTube API (bypasses manifest interception).
+  directHlsManifest?: Nullable<string>;
+
   // Friendly service display name derived from the URL domain via DOMAIN_CONFIG (e.g., "Hulu" for hulu.com). Used for SSE status display.
   serviceName: string;
 
@@ -1502,8 +1505,20 @@ export async function setupStream(options: StreamSetupOptions, onCircuitBreak: (
       // A failed tune on a service currently marked needs-sign-in most likely failed AT the auth wall, so the user-facing message leads with the remedy.
       throw new StreamSetupError("Stream error.", isCaptureError ? 503 : 500, withSignInGuidance("Failed to start stream.", channelName, serviceName), { cause: error });
     }
-
     const { captureSession, context, directTune, manifestInterception, page } = captureResult;
+
+    // Check if YouTube TV provided a direct HLS manifest via InnerTube API.
+    // This bypasses the need for manifest interception since we already have the HLS URL.
+    let directHlsManifest: Nullable<string> = null;
+    if(!manifestInterception) {
+      directHlsManifest = await page.evaluate((): string | null => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (window as any).__prismcast_direct_hls_manifest ?? null;
+      });
+      if(directHlsManifest) {
+        LOG.info("streaming:setup", "Using direct HLS manifest from YouTube TV InnerTube API: %s.", directHlsManifest);
+      }
+    }
 
     // Hold the page, capture session, and interceptor on a scope guard so a tune-verification failure below disposes them structurally rather than repeating the
     // teardown inline. Push order mirrors the capture-setup resource stack (page, capture session, interception): the interception is registered last so it disposes
@@ -1519,7 +1534,6 @@ export async function setupStream(options: StreamSetupOptions, onCircuitBreak: (
 
       owned.use(manifestInterception);
     }
-
     // Tune verification. The shared adjudication stage finalizes the manifest interceptor and confirms the captured master manifest URL belongs to the channel
     // that was just tuned. This step makes setupStream "verified by construction" - every consumer of StreamSetupResult (HLS preroll, HLS blocking, MPEG-TS,
     // native proxy, capture mode) receives a stream guaranteed to be on the requested channel without having to opt in or coordinate. Streams with no manifest
@@ -1598,7 +1612,8 @@ export async function setupStream(options: StreamSetupOptions, onCircuitBreak: (
       profileName,
       serviceName,
       streamId,
-      url
+      url,
+      directHlsManifest
     };
   });
 }

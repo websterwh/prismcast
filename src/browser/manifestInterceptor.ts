@@ -247,8 +247,11 @@ export interface ManifestInterceptionResult {
 
   // The kind selection decided the URL is, so no consumer re-derives it by comparing URLs.
   readonly selectedKind: RecognizedHlsPlaylistKind;
-}
 
+  // Whether the stream is encrypted (has DRM). For direct HLS manifests from YouTube TV,
+  // this is false since we'll handle decryption via Widevine keys from EME interceptor.
+  readonly isEncrypted: boolean;
+}
 /**
  * Handle returned by installManifestInterceptor. Provides the interception promise, a finalize function to signal that channel selection is complete, an epoch
  * stamp marking when channel selection begins, and an explicit dispose path. Implements TC39 Symbol.dispose so callers may use the "using" keyword for
@@ -427,7 +430,7 @@ export async function installManifestInterceptor(page: Page, timeout: number,
       LOG.debug("native:intercept", "Interception %s in %sms with %s capture(s). Using %s %s: %s.", reason, elapsed(), manifestCount,
         directTune ? "first" : "latest", selection.kind, selection.url.slice(0, 120));
       observer.dispose();
-      resolve({ manifestUrl: selection.url, selectedKind: selection.kind });
+      resolve({ manifestUrl: selection.url, selectedKind: selection.kind, isEncrypted: false });
     } else {
 
       LOG.debug("native:intercept", "Interception %s in %sms but no HLS playlist was captured.", reason, elapsed());

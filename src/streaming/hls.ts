@@ -1357,27 +1357,19 @@ interface NativeProxyOptions {
   // The URL the tune was asked for, as completeStreamSetup received it, which the native proxy and the manifest re-establishment use.
   readonly url: string;
 }
-
-/**
- * Attempts to upgrade the stream from capture to native HLS. Consumes the manifest interception already finalized by setupStream(), probes the manifest, creates a
- * native proxy, stops the capture pipeline, suppresses page audio, and updates the registry entry. Returns the codec and formatted quality string on success, or
- * null if native is not viable.
- * @param options - The stream's entry, its setup result, the requested URL, and whether the client is an MPEG-TS consumer.
- * @returns The native codec and quality info, or null if native streaming was not viable.
- */
-async function startNativeProxy(options: NativeProxyOptions): Promise<Nullable<NativeStreamingResult>> {
+export async function startNativeProxy(options: NativeProxyOptions): Promise<Nullable<NativeStreamingResult>> {
 
   const { entry, mpegTsClient, setup, url } = options;
   const { id: numericStreamId, info: { storeKey: channelName } } = entry;
 
-  if(!setup.manifestInterception) {
+  if(!setup.manifestInterception && !setup.directHlsManifest) {
 
     return null;
   }
 
   // The manifest interception was finalized and verified during setupStream(). By the time we get here, setup.manifestInterception.promise has already resolved
   // (or is about to) with the URL setupStream verified. We just consume it.
-
+  // If we have a direct HLS manifest (e.g., from YouTube TV InnerTube API), use it directly.
   // Read the preroll segment count from the entry to pass to the native coordinator. This value is set at registration time (not in the timer callback), so it's
   // available regardless of whether the deferred preroll timer has fired. The proxy uses it for segment index offset. The base URL for composite playlists is read
   // dynamically from the stream's HLS state at playlist generation time.
@@ -1391,14 +1383,17 @@ async function startNativeProxy(options: NativeProxyOptions): Promise<Nullable<N
     return reestablishChannelManifest({ channelName: setup.channelName, page, profile: setup.profile, streamIdStr: setup.streamId, url });
   };
 
-  const nativeResult = await attemptNativeStreaming({
+  // If we have a direct HLS manifest, create a resolved promise with that URL.
+  // This bypasses the manifest interception flow.
+  const interceptionPromise = setup.manifestInterception?.promise ??
+    Promise.resolve({ manifestUrl: setup.directHlsManifest!, selectedKind: "master", isEncrypted: false });
 
+  const nativeResult = await attemptNativeStreaming({
     channelName,
     emeInterceptor: setup.emeInterceptor,
-    interceptionPromise: setup.manifestInterception.promise,
+    interceptionPromise,
     mpegTsClient,
     onError: (error) => {
-
       if(isTerminationInitiated(numericStreamId)) {
 
         return;

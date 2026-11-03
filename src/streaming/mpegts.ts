@@ -317,7 +317,13 @@ async function serveMpegTsStream(streamId: number, channelName: string, req: Req
 
   const streamLog = LOG.withStreamId(stream.streamIdStr);
 
-  const remuxer = spawnMpegTsRemuxer(ffmpegBin, (error) => {
+  // Plex cuts its incoming MPEG-TS into one-second segments and can begin on any of those boundaries. The Annex B filters inject the fMP4 initialization's codec
+  // parameter sets at every random-access frame so a new decoder never receives an H.264/HEVC slice before its PPS/SPS/VPS.
+  const captureCodec = stream.identity.captureCodec?.toLowerCase();
+  const videoBitstreamFilter = (captureCodec === "h264") ? "h264_mp4toannexb" :
+    ((captureCodec === "hevc") ? "hevc_mp4toannexb" : undefined);
+
+  const remuxer = spawnMpegTsRemuxer(ffmpegBin, videoBitstreamFilter, (error) => {
 
     streamLog.debug("streaming:mpegts", "MPEG-TS remuxer error: %s.", formatError(error));
     cleanup();

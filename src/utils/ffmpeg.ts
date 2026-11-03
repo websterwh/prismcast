@@ -447,9 +447,10 @@ export function buildSpawnFFmpegArgs(audioBitrate: number, options: SpawnFFmpegO
  * The output flags emit ATSC-conventional MPEG-TS resembling a real HDHomeRun CONNECT DUO so Plex's transcoder makes the right assumptions about stream structure
  * (PID assignments, PAT/PMT frequency). Container metadata only - the actual A/V data is untouched by -c copy.
  *
+ * @param videoBitstreamFilter - Video bitstream filter that converts the fMP4 codec format to Annex B and repeats parameter sets at random-access frames.
  * @returns The FFmpeg argv array (excluding the binary itself).
  */
-export function buildMpegTsRemuxerArgs(): string[] {
+export function buildMpegTsRemuxerArgs(videoBitstreamFilter?: string): string[] {
 
   return [
     ...FFMPEG_INPUT_FLAGS,
@@ -457,6 +458,7 @@ export function buildMpegTsRemuxerArgs(): string[] {
     "-f", "mp4",
     "-i", "pipe:0",
     "-c", "copy",
+    ...(videoBitstreamFilter ? [ "-bsf:v", videoBitstreamFilter ] : []),
     ...MPEGTS_OUTPUT_FLAGS,
     // Write MPEG-TS to stdout.
     "pipe:1"
@@ -492,15 +494,21 @@ export function spawnFFmpeg(ffmpegBin: string, audioBitrate: number, onError: (e
  * Spawns an FFmpeg process configured to remux fMP4 input to MPEG-TS output with codec copy. The process reads a continuous fMP4 stream (init segment followed by
  * media segments) from stdin and writes MPEG-TS to stdout. No transcoding occurs - both video and audio are copied unchanged - so CPU usage is minimal.
  * @param ffmpegBin - The absolute path to the FFmpeg binary (typically the result of resolveFFmpegPath()).
+ * @param videoBitstreamFilter - Video bitstream filter that makes fMP4 H.264 or HEVC data decodable in independently cut MPEG-TS segments.
  * @param onError - Callback invoked when FFmpeg exits unexpectedly or encounters an error.
  * @param streamId - Optional stream identifier for logging.
  * @returns FFmpeg process wrapper with stdin, stdout, and kill function.
  */
-export function spawnMpegTsRemuxer(ffmpegBin: string, onError: (error: Error) => void, streamId?: string): FFmpegProcess {
+export function spawnMpegTsRemuxer(
+  ffmpegBin: string,
+  videoBitstreamFilter: string | undefined,
+  onError: (error: Error) => void,
+  streamId?: string
+): FFmpegProcess {
 
   return spawnFFmpegProcess({
 
-    args: buildMpegTsRemuxerArgs(),
+    args: buildMpegTsRemuxerArgs(videoBitstreamFilter),
     ffmpegBin,
     label: "MPEG-TS remuxer",
     onError,

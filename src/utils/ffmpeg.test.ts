@@ -542,12 +542,13 @@ describe("buildSpawnFFmpegArgs", () => {
 
 describe("buildMpegTsRemuxerArgs", () => {
 
-  /* The MPEG-TS remuxer's argv is fully static; we just verify the canonical flag positions and ATSC-conventional output flags that Plex's transcoder relies on.
+  /* The MPEG-TS remuxer's argv is deterministic for a given bitstream filter; we verify the canonical flag positions and ATSC-conventional output flags that
+   * Plex's transcoder relies on.
    */
 
   test("reads fragmented MP4 from stdin", () => {
 
-    const args = buildMpegTsRemuxerArgs();
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
 
     // The -f mp4 flag declares the input format before the -i flag.
     assert.deepEqual(args.slice(args.indexOf("-f"), args.indexOf("-f") + 2), [ "-f", "mp4" ]);
@@ -559,7 +560,7 @@ describe("buildMpegTsRemuxerArgs", () => {
 
   test("copies both video and audio without transcoding", () => {
 
-    const args = buildMpegTsRemuxerArgs();
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
     const copyIndex = args.indexOf("-c");
 
     assert.equal(args[copyIndex + 1], "copy");
@@ -567,7 +568,7 @@ describe("buildMpegTsRemuxerArgs", () => {
 
   test("emits MPEG-TS with ATSC-conventional service and PID conventions", () => {
 
-    const args = buildMpegTsRemuxerArgs();
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
 
     // Output container.
     assert.equal(args[args.lastIndexOf("-f") + 1], "mpegts");
@@ -580,9 +581,23 @@ describe("buildMpegTsRemuxerArgs", () => {
     assert.equal(args[args.indexOf("-pcr_period") + 1], "40");
   });
 
-  test("ends with pipe:1 so output goes to stdout", () => {
+  test("adds the selected Annex B filter before MPEG-TS muxing", () => {
+
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
+
+    assert.equal(args[args.indexOf("-bsf:v") + 1], "h264_mp4toannexb");
+  });
+
+  test("omits a video bitstream filter when the source codec is unknown", () => {
 
     const args = buildMpegTsRemuxerArgs();
+
+    assert.equal(args.includes("-bsf:v"), false);
+  });
+
+  test("ends with pipe:1 so output goes to stdout", () => {
+
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
 
     assert.equal(args.at(-1), "pipe:1");
   });
@@ -591,6 +606,6 @@ describe("buildMpegTsRemuxerArgs", () => {
 
     // The function is pure; consecutive calls produce structurally equal arrays. Tests assert this to lock the contract for production callers that may cache the
     // result locally.
-    assert.deepEqual(buildMpegTsRemuxerArgs(), buildMpegTsRemuxerArgs());
+    assert.deepEqual(buildMpegTsRemuxerArgs("h264_mp4toannexb"), buildMpegTsRemuxerArgs("h264_mp4toannexb"));
   });
 });

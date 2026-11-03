@@ -317,7 +317,7 @@ async function serveMpegTsStream(streamId: number, channelName: string, req: Req
 
   const streamLog = LOG.withStreamId(stream.streamIdStr);
 
-  const remuxer = spawnMpegTsRemuxer(ffmpegBin, stream.settings.frameRate, (error) => {
+  const remuxer = spawnMpegTsRemuxer(ffmpegBin, (error) => {
 
     streamLog.debug("streaming:mpegts", "MPEG-TS remuxer error: %s.", formatError(error));
     cleanup();

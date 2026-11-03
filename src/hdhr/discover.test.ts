@@ -481,4 +481,30 @@ describe("setupHdhrEndpoints - GET /status.json", () => {
       unregisterStream(entry.id);
     }
   });
+  describe("GET /auto/v:channelNumber", () => {
+
+    test("returns 400 for invalid channel numbers", async () => {
+
+      const res = await fetch(urlFor("/auto/vabc"));
+
+      assert.equal(res.status, 400);
+      assert.equal(await res.text(), "Invalid channel number.");
+    });
+
+    test("returns 404 for unknown channel numbers", async () => {
+
+      const res = await fetch(urlFor("/auto/v99999"));
+
+      assert.equal(res.status, 404);
+      assert.equal(await res.text(), "Unknown channel number.");
+    });
+
+    test("accepts channel numbers without the leading v prefix", async () => {
+
+      const res = await fetch(urlFor("/auto/99999"));
+
+      assert.equal(res.status, 404);
+      assert.equal(await res.text(), "Unknown channel number.");
+    });
+  });
 });

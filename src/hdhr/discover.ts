@@ -6,7 +6,8 @@ import type { Express, Request, Response } from "express";
 import { HDHR_FIRMWARE_NAME, HDHR_MANUFACTURER, HDHR_MODEL_NUMBER } from "./identity.ts";
 import { escapeXml, getPackageVersion } from "../utils/index.ts";
 import { CONFIG } from "../config/index.ts";
-import { buildChannelMap } from "./channelMap.ts";
+import { buildChannelMap, getChannelKeyByNumber } from "./channelMap.ts";
+import { handleMpegTsStream } from "../streaming/mpegts.ts";
 import { getTunerStates } from "./tunerState.ts";
 
 /* These endpoints implement the HDHomeRun HTTP API that Plex uses to identify, configure, and monitor tuners. Plex auto-detects PrismCast on the LAN through
@@ -229,4 +230,34 @@ export function setupHdhrEndpoints(app: Express, boundPort: () => number): void 
 
     res.json(tuners);
   });
+
+  // GET /auto/v:channelNumber and /auto/:channelNumber - Direct channel tuning endpoint expected by Plex and SiliconDust-compatible clients.
+  // Resolves the numeric channel number to its configured channel key, then delegates directly to the MPEG-TS stream handler.
+  const handleAutoTune = (req: Request, res: Response): void => {
+
+    const channelParam = (req.params as { channelNumber?: string }).channelNumber;
+    const channelNumber = parseInt(channelParam ?? "", 10);
+
+    if(Number.isNaN(channelNumber)) {
+
+      res.status(400).send("Invalid channel number.");
+
+      return;
+    }
+
+    const channelKey = getChannelKeyByNumber(channelNumber);
+
+    if(!channelKey) {
+
+      res.status(404).send("Unknown channel number.");
+
+      return;
+    }
+
+    (req.params as { name?: string }).name = channelKey;
+    void handleMpegTsStream(req, res);
+  };
+
+  app.get("/auto/v:channelNumber", handleAutoTune);
+  app.get("/auto/:channelNumber", handleAutoTune);
 }

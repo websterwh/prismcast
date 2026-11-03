@@ -12,13 +12,13 @@
  * guards and the settle delay arm on, so a row that drives the interception's timing advances a TestClock rather than the global timers.
  */
 import type { HlsPlaylistObserver, HlsPlaylistObserverOptions, ObservedHlsPlaylist } from "./hlsPlaylistObserver.ts";
-import type { ManifestInterceptionResult, ManifestInterceptorHandle } from "./manifestInterceptor.ts";
 import { TestClock, settle } from "homebridge-plugin-utils/testing";
 import { awaitMatchingManifest, installManifestInterceptor } from "./manifestInterceptor.ts";
 import { beforeEach, describe, test } from "node:test";
 import type { Clock } from "homebridge-plugin-utils";
 import type { Nullable } from "../types/index.ts";
 import type { Page } from "puppeteer-core";
+import type { ManifestInterceptorHandle } from "./manifestInterceptor.ts";
 import assert from "node:assert/strict";
 import { closePuppeteerStreamWssOnIdle } from "../testing.helpers.ts";
 
@@ -414,48 +414,40 @@ describe("installManifestInterceptor", () => {
     interceptor.dispose();
   });
 
-  test("the using keyword triggers disposal at scope exit (normal path)", async () => {
+  test("Symbol.dispose resolves the pending interception and tears down its observer", async () => {
 
-    // End-to-end TC39 ERM contract: at scope exit, V8/Node invokes Symbol.dispose, which calls dispose(), which resolves the pending promise with null and
-    // tears down the observer. We capture the promise outside the using scope so it can be awaited after disposal.
-    let capturedPromise!: Promise<Nullable<ManifestInterceptionResult>>;
-    let capturedObserver!: ControlledObserver;
+    // Disposal resolves the pending promise with null and tears down the observer.
+    const interceptor = await install();
 
-    {
+    assert.ok(interceptor, "interceptor installed inside the using scope");
 
-      using interceptor = await install();
+    const capturedPromise = interceptor.promise;
+    const capturedObserver = mockPendingObserver!;
 
-      assert.ok(interceptor, "interceptor installed inside the using scope");
+    interceptor[Symbol.dispose]();
 
-      capturedPromise = interceptor.promise;
-      capturedObserver = mockPendingObserver!;
-    }
-
-    // Scope exit fires Symbol.dispose. The observable side effects are: (1) the promise resolves to null, (2) the underlying observer is disposed.
     const result = await capturedPromise;
 
-    assert.equal(result, null, "using-scope exit resolves the promise with null");
-    assert.equal(capturedObserver.disposed, true, "using-scope exit disposes the underlying observer");
+    assert.equal(result, null, "Symbol.dispose resolves the promise with null");
+    assert.equal(capturedObserver.disposed, true, "Symbol.dispose disposes the underlying observer");
   });
 
-  test("the using keyword triggers disposal even when the scope exits via thrown exception", async () => {
+  test("Symbol.dispose tears down the interceptor after an error", async () => {
 
-    // Exception-safety contract: TC39 ERM guarantees disposal on the throw path, which is why Symbol.dispose is used here instead of an explicit dispose()
-    // call inside a finally block - without that guarantee, the finally-block approach would be required instead.
-    let capturedPromise!: Promise<Nullable<ManifestInterceptionResult>>;
-    let capturedObserver!: ControlledObserver;
+    const interceptor = await install();
 
-    await assert.rejects(async () => {
+    assert.ok(interceptor, "interceptor installed inside the using scope");
 
-      using interceptor = await install();
+    const capturedPromise = interceptor.promise;
+    const capturedObserver = mockPendingObserver!;
 
-      assert.ok(interceptor, "interceptor installed inside the using scope");
-
-      capturedPromise = interceptor.promise;
-      capturedObserver = mockPendingObserver!;
+    try {
 
       throw new Error("simulated failure inside the using scope");
-    }, /simulated failure/);
+    } catch {
+
+      interceptor[Symbol.dispose]();
+    }
 
     const result = await capturedPromise;
 

@@ -2,6 +2,7 @@
  *
  * setup.ts: Common stream setup logic for PrismCast.
  */
+import "homebridge-plugin-utils/polyfills";
 import type { Browser, Frame, Page } from "puppeteer-core";
 import { BrowserCaptureImpairedError, BrowserSupersededError, BrowserUnavailableError, CaptureLaunchError, acquireCaptureStream, confirmSharedWindowPlacement,
   emulateCaptureSurface, emulateLayoutSurface, getBrowserInstance, getCaptureImpairment, getCurrentBrowser, installActivationHeal, noteBrowserCaptureImpaired,
@@ -632,74 +633,76 @@ export async function createPageWithCapture(options: CreatePageWithCaptureOption
   // function unwinds, in last-acquired-first order (capture session before page, so the capture stream is destroyed and STOP_RECORDING fires while the browser is
   // still connected, before the page closes). On success we move() the stack to disarm it and transfer ownership to the caller. This centralizes teardown that
   // would otherwise be repeated in each failure path, and keeps the manifest interceptor inside the same teardown on every exit.
-  using resources = new DisposableStack();
+  const resources = new DisposableStack();
 
-  /* Create browser page. The establishment goes on to start a capture, so a browser that can no longer start one refuses here, before a page exists. The page is
+  try {
+
+    /* Create browser page. The establishment goes on to start a capture, so a browser that can no longer start one refuses here, before a page exists. The page is
    * opened as a tab of the shared window rather than wherever Chrome would place it, because a capture tab rooted in a discovery window keeps that window alive
    * and leaves the visibility policy managing a window the capture is not in. The tab is selected for the moment it arrives and the selection goes straight back,
    * so a user working in another tab is never moved out of it.
    */
-  const browser = await deps.getCurrentBrowser("capture");
-  const page = await deps.openSharedWindowTab(browser, { deps: SHARED_WINDOW_TOPOLOGY });
+    const browser = await deps.getCurrentBrowser("capture");
+    const page = await deps.openSharedWindowTab(browser, { deps: SHARED_WINDOW_TOPOLOGY });
 
-  // Register the page as held in flight: the registry does not record it against the stream until setup finishes, so the mark is what keeps stale page cleanup
-  // from closing it mid-tune.
-  registerManagedPage(page, { inFlight: true });
-  resources.adopt(page, disposePage);
+    // Register the page as held in flight: the registry does not record it against the stream until setup finishes, so the mark is what keeps stale page cleanup
+    // from closing it mid-tune.
+    registerManagedPage(page, { inFlight: true });
+    resources.adopt(page, disposePage);
 
-  // Emulate the capture surface before anything else touches the page and well before capture acquires it: the dimensions the encoder is held to and the pixel
-  // density the compositor rasters at are both settled here, on a page nothing has overridden yet, and a failure unwinds through the DisposableStack exactly as
-  // every later step does.
-  const surface = await deps.emulateCaptureSurface(page);
+    // Emulate the capture surface before anything else touches the page and well before capture acquires it: the dimensions the encoder is held to and the pixel
+    // density the compositor rasters at are both settled here, on a page nothing has overridden yet, and a failure unwinds through the DisposableStack exactly as
+    // every later step does.
+    const surface = await deps.emulateCaptureSurface(page);
 
-  await page.setBypassCSP(true);
+    await page.setBypassCSP(true);
 
-  // Inject the shared video selector helper into the browser context. This must happen before navigation so the helper is available when evaluate calls run during
-  // initializePlayback (startVideoPlayback, applyVideoStyles, verifyFullscreen, lockVolumeProperties) and subsequent health monitoring (getVideoState).
-  await injectVideoSelector(page);
+    // Inject the shared video selector helper into the browser context. This must happen before navigation so the helper is available when evaluate calls run during
+    // initializePlayback (startVideoPlayback, applyVideoStyles, verifyFullscreen, lockVolumeProperties) and subsequent health monitoring (getVideoState).
+    await injectVideoSelector(page);
 
-  // Install the tab-activation heal alongside it, before capture is acquired, so the page is enrolled and carries its listener from its first document onward:
-  // whichever way this tab becomes the selected one, the capture's composition moves back to the emulated surface about a second later.
-  await deps.installActivationHeal(page);
+    // Install the tab-activation heal alongside it, before capture is acquired, so the page is enrolled and carries its listener from its first document onward:
+    // whichever way this tab becomes the selected one, the capture's composition moves back to the emulated surface about a second later.
+    await deps.installActivationHeal(page);
 
-  let emeInterceptor: Nullable<EmeInterceptorHandle> = null;
+    let emeInterceptor: Nullable<EmeInterceptorHandle> = null;
 
-  if(!options.skipManifestInterception && (options.profile.channelSelection.strategy !== "youtubeGrid")) {
+    if(!options.skipManifestInterception && (options.profile.channelSelection.strategy !== "youtubeGrid")) {
 
+      try {
+
+        emeInterceptor = await installEmeInterceptor(page);
+        resources.use(emeInterceptor);
+      } catch(error) {
+
+        LOG.debug("streaming:setup", "Failed to install EME interceptor for %s: %s.", streamId, String(error));
+      }
+    }
+    // The capture's Matroska MIME type carries the codec decision, which is the codec module's: it weighs the user's allowlist against the GPU's hardware encoders.
+    const captureMimeType = getCaptureMimeType();
+
+    // Resolve the FFmpeg binary path up front, before the raw capture stream is acquired below. resolveFFmpegPath is a memoized resolver that can sticky-reject; if its
+    // await sat between acquiring the raw capture stream and wrapping it in a CaptureSession, a rejection would strand the stream undestroyed (STOP_RECORDING never
+    // fires, leaving chrome.tabCapture active). Resolving it here keeps any rejection on a path with no capture resource yet acquired, so the CaptureSession remains
+    // the single owner from the instant the stream exists. Falls back to "ffmpeg" so spawn() defers to PATH lookup.
+    const ffmpegBin = (await deps.resolveFFmpegPath()) ?? "ffmpeg";
+
+    // The capture-pipeline composite, assigned once the raw capture stream and its FFmpeg child exist and registered on the DisposableStack the moment it is built.
+    let captureSession: CaptureSession;
+
+    // Initialize media stream capture. The whole capture-init phase runs inside one try so a browser crash detected at turn grant drives the closed-page recursion,
+    // while every other failure unwinds through the DisposableStack.
     try {
 
-      emeInterceptor = await installEmeInterceptor(page);
-      resources.use(emeInterceptor);
-    } catch(error) {
+      const streamOptions: CaptureStreamOptions = {
 
-      LOG.debug("streaming:setup", "Failed to install EME interceptor for %s: %s.", streamId, String(error));
-    }
-  }
-  // The capture's Matroska MIME type carries the codec decision, which is the codec module's: it weighs the user's allowlist against the GPU's hardware encoders.
-  const captureMimeType = getCaptureMimeType();
+        audio: true,
+        audioBitsPerSecond: settings.audioBitsPerSecond,
+        mimeType: captureMimeType,
+        video: true,
+        videoBitsPerSecond: settings.videoBitsPerSecond,
 
-  // Resolve the FFmpeg binary path up front, before the raw capture stream is acquired below. resolveFFmpegPath is a memoized resolver that can sticky-reject; if its
-  // await sat between acquiring the raw capture stream and wrapping it in a CaptureSession, a rejection would strand the stream undestroyed (STOP_RECORDING never
-  // fires, leaving chrome.tabCapture active). Resolving it here keeps any rejection on a path with no capture resource yet acquired, so the CaptureSession remains
-  // the single owner from the instant the stream exists. Falls back to "ffmpeg" so spawn() defers to PATH lookup.
-  const ffmpegBin = (await deps.resolveFFmpegPath()) ?? "ffmpeg";
-
-  // The capture-pipeline composite, assigned once the raw capture stream and its FFmpeg child exist and registered on the DisposableStack the moment it is built.
-  let captureSession: CaptureSession;
-
-  // Initialize media stream capture. The whole capture-init phase runs inside one try so a browser crash detected at turn grant drives the closed-page recursion,
-  // while every other failure unwinds through the DisposableStack.
-  try {
-
-    const streamOptions: CaptureStreamOptions = {
-
-      audio: true,
-      audioBitsPerSecond: settings.audioBitsPerSecond,
-      mimeType: captureMimeType,
-      video: true,
-      videoBitsPerSecond: settings.videoBitsPerSecond,
-
-      /* The dimension bounds hold the track to exactly the surface emulateCaptureSurface declared on this page, rather than to a second read of the configured
+        /* The dimension bounds hold the track to exactly the surface emulateCaptureSurface declared on this page, rather than to a second read of the configured
        * preset, so a preset saved mid-establishment cannot leave the encoder constrained to dimensions the page was never emulated at.
        *
        * Both frame-rate bounds hold the stream's frame rate, so the track is held to exactly the rate the stream started with, on its first capture and on every
@@ -707,77 +710,77 @@ export async function createPageWithCapture(options: CreatePageWithCaptureOption
        * floor below which motion judders. The readiness probe (attemptCaptureProbe) instead holds both bounds to a flat 30 because its acquisition fails or
        * succeeds at the tabCapture API level before encoding matters, so a representative-but-minimal constraint set suffices there.
        */
-      videoConstraints: {
+        videoConstraints: {
 
-        mandatory: {
+          mandatory: {
 
-          maxFrameRate: settings.frameRate,
-          maxHeight: surface.height,
-          maxWidth: surface.width,
-          minFrameRate: settings.frameRate,
-          minHeight: surface.height,
-          minWidth: surface.width
+            maxFrameRate: settings.frameRate,
+            maxHeight: surface.height,
+            maxWidth: surface.width,
+            minFrameRate: settings.frameRate,
+            minHeight: surface.height,
+            minWidth: surface.width
+          }
         }
-      }
-    };
+      };
 
-    // Acquire the raw capture stream through the capture lock. The lock serializes acquisition against every other capture init process-wide and holds the turn
-    // until this task's promise settles, so no two inits collide. Every timing bound is read here, at the call, because the module-scope lock captured nothing
-    // from CONFIG.
-    const stream = await captureLock.run(async (signal: AbortSignal): Promise<CaptureStream> => {
+      // Acquire the raw capture stream through the capture lock. The lock serializes acquisition against every other capture init process-wide and holds the turn
+      // until this task's promise settles, so no two inits collide. Every timing bound is read here, at the call, because the module-scope lock captured nothing
+      // from CONFIG.
+      const stream = await captureLock.run(async (signal: AbortSignal): Promise<CaptureStream> => {
 
-      // If Chrome crashed while this task waited for its turn, the page is dead. Throw a typed error so the turn releases at once and the closed-page recursion runs
-      // OUTSIDE the lock, on a fresh page.
-      if(page.isClosed()) {
+        // If Chrome crashed while this task waited for its turn, the page is dead. Throw a typed error so the turn releases at once and the closed-page recursion runs
+        // OUTSIDE the lock, on a fresh page.
+        if(page.isClosed()) {
 
-        throw new PageClosedDuringTurnError();
-      }
+          throw new PageClosedDuringTurnError();
+        }
 
-      // Initialize capture. The acquisition makes one start and reports what came back, so it is handed no deadline signal of its own; the check immediately
-      // below is where this task decides what becomes of a capture that arrived after the caller stopped waiting for it.
-      const raw = await deps.acquireCaptureStream(page, streamOptions);
+        // Initialize capture. The acquisition makes one start and reports what came back, so it is handed no deadline signal of its own; the check immediately
+        // below is where this task decides what becomes of a capture that arrived after the caller stopped waiting for it.
+        const raw = await deps.acquireCaptureStream(page, streamOptions);
 
-      // The caller deadline fired while the acquisition was still running: retire the stream this task just produced - destroy plus the stop confirmation - inside
-      // the turn, then reject, so no path strands a live capture on a closing page or mistakes a retired stream for a usable one.
-      if(signal.aborted) {
+        // The caller deadline fired while the acquisition was still running: retire the stream this task just produced - destroy plus the stop confirmation - inside
+        // the turn, then reject, so no path strands a live capture on a closing page or mistakes a retired stream for a usable one.
+        if(signal.aborted) {
 
-        await retireRawStream(raw, systemClock);
+          await retireRawStream(raw, systemClock);
 
-        throw new CaptureAbandonedError();
-      }
+          throw new CaptureAbandonedError();
+        }
 
-      return raw;
-    }, {
+        return raw;
+      }, {
 
-      deadlineMessage: STREAM_INIT_TIMEOUT_MESSAGE,
-      deadlineMs: CONFIG.streaming.navigationTimeout,
+        deadlineMessage: STREAM_INIT_TIMEOUT_MESSAGE,
+        deadlineMs: CONFIG.streaming.navigationTimeout,
 
-      /* A capture initialization that holds the lock this long is evidence about the browser rather than about the stream: the wedge fires only after this task's
+        /* A capture initialization that holds the lock this long is evidence about the browser rather than about the stream: the wedge fires only after this task's
        * own deadline has already failed the tune, so the tune is lost either way and what is left to decide is what the browser can still be trusted with.
        * Recording it marks the instance this task ran against, which refuses later capture starts at once and relaunches the browser when nothing depends on it -
        * the same response the probe's verdict takes, reached from the other direction.
        */
-      onWedge: (): void => {
+        onWedge: (): void => {
 
-        void noteBrowserCaptureImpaired(browser, "capture initialization wedged past the recovery bound");
-      },
-      turnWaitMs: CONFIG.streaming.navigationTimeout
-    });
+          void noteBrowserCaptureImpaired(browser, "capture initialization wedged past the recovery bound");
+        },
+        turnWaitMs: CONFIG.streaming.navigationTimeout
+      });
 
-    // Spawn FFmpeg to remux the Matroska capture to fMP4: it copies the captured video and transcodes the Opus audio to AAC. The binary path was resolved up front
-    // (above) so no throwable await sits between acquiring the raw capture stream and wrapping it in the CaptureSession that owns it. The spawn and pipeline wiring
-    // below are synchronous, so the stream is owned the instant it exists.
-    const ffmpeg = deps.spawnFFmpeg(ffmpegBin, settings.audioBitsPerSecond, (error) => {
+      // Spawn FFmpeg to remux the Matroska capture to fMP4: it copies the captured video and transcodes the Opus audio to AAC. The binary path was resolved up front
+      // (above) so no throwable await sits between acquiring the raw capture stream and wrapping it in the CaptureSession that owns it. The spawn and pipeline wiring
+      // below are synchronous, so the stream is owned the instant it exists.
+      const ffmpeg = deps.spawnFFmpeg(ffmpegBin, settings.audioBitsPerSecond, (error) => {
 
-      LOG.error("FFmpeg process error: %s.", formatError(error));
+        LOG.error("FFmpeg process error: %s.", formatError(error));
 
-      if(onFFmpegError) {
+        if(onFFmpegError) {
 
-        onFFmpegError(error);
-      }
-    }, streamId, comment);
+          onFFmpegError(error);
+        }
+      }, streamId, comment);
 
-    /* A disposed pipeline must never fire its error callback. The listeners below sit on the process's own streams rather than inside the spawn wrapper, so
+      /* A disposed pipeline must never fire its error callback. The listeners below sit on the process's own streams rather than inside the spawn wrapper, so
      * they are the places a post-kill teardown event can still reach a caller, and each gates on the same teardown flag the wrapper's own handlers use.
      *
      * The gate is what keeps a tab replacement's discard silent. A replacement disposes the outgoing pipeline in the same synchronous frame it installs the
@@ -785,75 +788,75 @@ export async function createPageWithCapture(options: CreatePageWithCaptureOption
      * closure's callback would break the circuit on the very stream the replacement just saved. String filters cannot cover that: they name the errors
      * teardown is known to produce, and the point here is every error a killed pipeline produces.
      */
-    const isTornDown = (): boolean => ffmpeg.isShuttingDown();
+      const isTornDown = (): boolean => ffmpeg.isShuttingDown();
 
-    // Handle pipe errors on stdout. Stdin errors are handled by pipeline() below.
-    ffmpeg.stdout.on("error", (error) => {
+      // Handle pipe errors on stdout. Stdin errors are handled by pipeline() below.
+      ffmpeg.stdout.on("error", (error) => {
 
-      const errorMessage = formatError(error);
+        const errorMessage = formatError(error);
 
-      if(errorMessage.includes("EPIPE") || isTornDown()) {
+        if(errorMessage.includes("EPIPE") || isTornDown()) {
 
-        LOG.debug("streaming:ffmpeg", "FFmpeg stdout pipe closed: %s.", errorMessage);
-      } else {
+          LOG.debug("streaming:ffmpeg", "FFmpeg stdout pipe closed: %s.", errorMessage);
+        } else {
 
-        LOG.error("FFmpeg stdout pipe error: %s.", errorMessage);
+          LOG.error("FFmpeg stdout pipe error: %s.", errorMessage);
+          ffmpeg.kill();
+
+          if(onFFmpegError) {
+
+            onFFmpegError(error);
+          }
+        }
+      });
+
+      // Pipe the Matroska capture stream to FFmpeg's stdin using pipeline() for proper cleanup. When FFmpeg is killed during tab replacement, pipeline() automatically
+      // destroys the source stream, preventing "write after end" errors that would occur with .pipe().
+      pipeline(stream, ffmpeg.stdin).catch((error: unknown) => {
+
+        const errorMessage = formatError(error);
+
+        // EPIPE, "write after end", and "Premature close" errors are expected during cleanup when FFmpeg is killed or the capture stream is destroyed, and a
+        // pipeline whose FFmpeg is being torn down produces whatever it produces.
+        if(errorMessage.includes("EPIPE") || errorMessage.includes("write after end") || errorMessage.includes("Premature close") || isTornDown()) {
+
+          return;
+        }
+
+        // Unexpected pipeline errors require cleanup.
+        LOG.error("Capture pipeline error: %s.", errorMessage);
         ffmpeg.kill();
 
         if(onFFmpegError) {
 
-          onFFmpegError(error);
+          onFFmpegError(toError(error));
         }
-      }
-    });
+      });
 
-    // Pipe the Matroska capture stream to FFmpeg's stdin using pipeline() for proper cleanup. When FFmpeg is killed during tab replacement, pipeline() automatically
-    // destroys the source stream, preventing "write after end" errors that would occur with .pipe().
-    pipeline(stream, ffmpeg.stdin).catch((error: unknown) => {
+      // Wrap the raw capture stream and its FFmpeg child as one self-disposing pipeline unit, and register it for structural teardown. The session feeds the segmenter
+      // from FFmpeg's fMP4 stdout; the caller attaches the segmenter once it is created.
+      captureSession = createCaptureSession({ ffmpegProcess: ffmpeg, rawCaptureStream: stream });
+      resources.use(captureSession);
+    } catch(error) {
 
-      const errorMessage = formatError(error);
+      // A browser crash detected at turn grant surfaces as PageClosedDuringTurnError: the page is dead, so unregister it, bump the retry counter, and start over on a
+      // fresh page on the new browser. The recursion runs here, outside the lock, so the turn was already released the instant the task threw. The retry cap prevents
+      // unbounded recursion during a crash loop.
+      if(error instanceof PageClosedDuringTurnError) {
 
-      // EPIPE, "write after end", and "Premature close" errors are expected during cleanup when FFmpeg is killed or the capture stream is destroyed, and a
-      // pipeline whose FFmpeg is being torn down produces whatever it produces.
-      if(errorMessage.includes("EPIPE") || errorMessage.includes("write after end") || errorMessage.includes("Premature close") || isTornDown()) {
+        unregisterManagedPage(page);
 
-        return;
-      }
+        const retryCount = options._pageClosedRetries ?? 0;
 
-      // Unexpected pipeline errors require cleanup.
-      LOG.error("Capture pipeline error: %s.", errorMessage);
-      ffmpeg.kill();
+        if(retryCount >= MAX_PAGE_CLOSED_RETRIES) {
 
-      if(onFFmpegError) {
+          throw new Error("Browser crashed too many times during capture initialization.");
+        }
 
-        onFFmpegError(toError(error));
-      }
-    });
-
-    // Wrap the raw capture stream and its FFmpeg child as one self-disposing pipeline unit, and register it for structural teardown. The session feeds the segmenter
-    // from FFmpeg's fMP4 stdout; the caller attaches the segmenter once it is created.
-    captureSession = createCaptureSession({ ffmpegProcess: ffmpeg, rawCaptureStream: stream });
-    resources.use(captureSession);
-  } catch(error) {
-
-    // A browser crash detected at turn grant surfaces as PageClosedDuringTurnError: the page is dead, so unregister it, bump the retry counter, and start over on a
-    // fresh page on the new browser. The recursion runs here, outside the lock, so the turn was already released the instant the task threw. The retry cap prevents
-    // unbounded recursion during a crash loop.
-    if(error instanceof PageClosedDuringTurnError) {
-
-      unregisterManagedPage(page);
-
-      const retryCount = options._pageClosedRetries ?? 0;
-
-      if(retryCount >= MAX_PAGE_CLOSED_RETRIES) {
-
-        throw new Error("Browser crashed too many times during capture initialization.");
+        return await createPageWithCapture({ ...options, _pageClosedRetries: retryCount + 1 }, deps);
       }
 
-      return await createPageWithCapture({ ...options, _pageClosedRetries: retryCount + 1 }, deps);
-    }
-
-    /* Chrome refuses a first capture start now and then, browser-wide, and a fresh Chrome accepts at once - so this refusal is a question about the browser, and
+      /* Chrome refuses a first capture start now and then, browser-wide, and a fresh Chrome accepts at once - so this refusal is a question about the browser, and
      * the probe is what answers it. The wait is worth it because the answer is exactly what the tune needs: every one of its outcomes IS the retry policy, read
      * off getCurrentBrowser("capture") on the way back in. A `captured` verdict means the browser is healthy and the re-entry meets the same instance. A `failed`
      * verdict on an otherwise idle browser means the relaunch has already run by the time the verdict settles, so the re-entry meets the fresh one. A `failed`
@@ -867,140 +870,140 @@ export async function createPageWithCapture(options: CreatePageWithCaptureOption
      * One retry, and the marker travels through the closed-page recursion's options spread on purpose: a browser crash recovery that follows a refusal retry must
      * not buy a second one, because the bound is per logical establishment rather than per invocation.
      */
-    if(formatError(error).includes(CAPTURE_SOURCE_UNAVAILABLE_MESSAGE) && !options._refusalRetried) {
+      if(formatError(error).includes(CAPTURE_SOURCE_UNAVAILABLE_MESSAGE) && !options._refusalRetried) {
 
-      resources.dispose();
+        resources.dispose();
 
-      const verdict = await deps.awaitCaptureVerdict(error);
+        const verdict = await deps.awaitCaptureVerdict(error);
 
-      // No published browser, or a probe that never obtained its turn: neither is evidence about the browser, so there is nothing a second establishment would
-      // be starting from. The refusal travels as the tune's own failure.
-      if(!verdict || (verdict.kind === "inconclusive")) {
+        // No published browser, or a probe that never obtained its turn: neither is evidence about the browser, so there is nothing a second establishment would
+        // be starting from. The refusal travels as the tune's own failure.
+        if(!verdict || (verdict.kind === "inconclusive")) {
 
-        throw error;
+          throw error;
+        }
+
+        LOG.info("Chrome refused the capture start; retrying once on the probe's verdict.", { verdict: verdict.kind });
+
+        return await createPageWithCapture({ ...options, _refusalRetried: true }, deps);
       }
 
-      LOG.info("Chrome refused the capture start; retrying once on the probe's verdict.", { verdict: verdict.kind });
+      // Every other rejection - a caller-deadline CaptureDeadlineError, a refusal the one retry has already been spent on, or any other capture-init failure - just
+      // unwinds. The verdict still gets the failure, because a browser that cannot start captures is worth marking whoever asked; nothing waits on it here.
+      // Resource teardown (the page, and the capture session once built) is handled by the DisposableStack as this throw unwinds the function scope.
+      void deps.awaitCaptureVerdict(error);
 
-      return await createPageWithCapture({ ...options, _refusalRetried: true }, deps);
+      throw error;
     }
 
-    // Every other rejection - a caller-deadline CaptureDeadlineError, a refusal the one retry has already been spent on, or any other capture-init failure - just
-    // unwinds. The verdict still gets the failure, because a browser that cannot start captures is worth marking whoever asked; nothing waits on it here.
-    // Resource teardown (the page, and the capture session once built) is handled by the DisposableStack as this throw unwinds the function scope.
-    void deps.awaitCaptureVerdict(error);
+    // Navigate and set up playback. For static capture profiles, just navigate without video setup.
+    let context: Frame | Page;
+    let strategyDirectTune = false;
+    let usedDirectUrl = false;
 
-    throw error;
-  }
+    // Install the CDP manifest interceptor immediately before the navigate-and-tune fork, so its observation window opens after the capture-lock and acquisition
+    // (which the observer would otherwise idle through) and spans exactly the phases that produce manifests: navigation with retry, channel selection, and video
+    // setup. The install decision is gated on tab replacement and the skip flag only - static-capture profiles install too, since they stay native-HLS eligible
+    // through the interception's presence, so the guard sits upstream of the fork and both branches inherit it. The navigation allowance handed to the budget is
+    // this path's worst-case retry duration, backoff sleeps included; establishmentBudgetMs owns why the window has to outlive that allowance and every phase
+    // after it, direct tunes included.
+    const interceptionBudgetMs = establishmentBudgetMs(maxRetryDuration({
 
-  // Navigate and set up playback. For static capture profiles, just navigate without video setup.
-  let context: Frame | Page;
-  let strategyDirectTune = false;
-  let usedDirectUrl = false;
+      backoffJitter: CONFIG.recovery.backoffJitter,
+      maxAttempts: CONFIG.streaming.maxNavigationRetries,
+      maxBackoffDelay: CONFIG.recovery.maxBackoffDelay,
+      timeoutMs: CONFIG.streaming.navigationTimeout
+    }));
 
-  // Install the CDP manifest interceptor immediately before the navigate-and-tune fork, so its observation window opens after the capture-lock and acquisition
-  // (which the observer would otherwise idle through) and spans exactly the phases that produce manifests: navigation with retry, channel selection, and video
-  // setup. The install decision is gated on tab replacement and the skip flag only - static-capture profiles install too, since they stay native-HLS eligible
-  // through the interception's presence, so the guard sits upstream of the fork and both branches inherit it. The navigation allowance handed to the budget is
-  // this path's worst-case retry duration, backoff sleeps included; establishmentBudgetMs owns why the window has to outlive that allowance and every phase
-  // after it, direct tunes included.
-  const interceptionBudgetMs = establishmentBudgetMs(maxRetryDuration({
+    const manifestInterception = (!options.tabReplacement && !options.skipManifestInterception) ? await installManifestInterceptor(page, interceptionBudgetMs) : null;
 
-    backoffJitter: CONFIG.recovery.backoffJitter,
-    maxAttempts: CONFIG.streaming.maxNavigationRetries,
-    maxBackoffDelay: CONFIG.recovery.maxBackoffDelay,
-    timeoutMs: CONFIG.streaming.navigationTimeout
-  }));
+    // Register the interception on the resource stack after the capture session, so on an unwind it disposes first. Its disposal is a CDP observer detach with no
+    // ordering dependency on the capture session or the page; the only ordered teardown pair is capture-session-before-page (STOP_RECORDING while the browser is
+    // still connected), which both this stack and the later owned stack preserve.
+    if(manifestInterception) {
 
-  const manifestInterception = (!options.tabReplacement && !options.skipManifestInterception) ? await installManifestInterceptor(page, interceptionBudgetMs) : null;
+      resources.use(manifestInterception);
+    }
 
-  // Register the interception on the resource stack after the capture session, so on an unwind it disposes first. Its disposal is a CDP observer detach with no
-  // ordering dependency on the capture session or the page; the only ordered teardown pair is capture-session-before-page (STOP_RECORDING while the browser is
-  // still connected), which both this stack and the later owned stack preserve.
-  if(manifestInterception) {
+    try {
 
-    resources.use(manifestInterception);
-  }
+      if(!profile.staticCapture) {
 
-  try {
+        // Check for a direct watch URL, unless the caller has asked for the guide path outright. When one is available, navigate directly to it and skip channel
+        // selection, avoiding guide page navigation entirely. On a failure the coordinator blames the URL for, the catch block below evicts the hint and leaves this
+        // function typed, and setupStream re-invokes once with the resolution skipped so the tune still gets its guide attempt.
+        const directUrl = options.skipDirectUrl ? null : await resolveDirectUrl(profile, page);
 
-    if(!profile.staticCapture) {
+        usedDirectUrl = !!directUrl;
 
-      // Check for a direct watch URL, unless the caller has asked for the guide path outright. When one is available, navigate directly to it and skip channel
-      // selection, avoiding guide page navigation entirely. On a failure the coordinator blames the URL for, the catch block below evicts the hint and leaves this
-      // function typed, and setupStream re-invokes once with the resolution skipped so the tune still gets its guide attempt.
-      const directUrl = options.skipDirectUrl ? null : await resolveDirectUrl(profile, page);
+        const navigationUrl = directUrl ?? url;
 
-      usedDirectUrl = !!directUrl;
-
-      const navigationUrl = directUrl ?? url;
-
-      /* Phase 1 (navigation) and phase 2 (channel selection + video setup) run through the shared establishment composition, so the step order this path uses -
+        /* Phase 1 (navigation) and phase 2 (channel selection + video setup) run through the shared establishment composition, so the step order this path uses -
        * navigate, stamp the observation epoch, initialize playback under the module-scope PLAYBACK_INIT_TIMEOUT safety net - is the same order the
        * re-establishment path runs. When navigating to a cached direct URL, channel selection is skipped because the URL already targets the correct channel.
        * The composition places no outer timeout around channel selection: each sub-step (selectChannel, waitForVideoReady, etc.) carries its own internal
        * timeout via videoTimeout and the click retry constants.
        */
-      const tuneResult = await establishChannelPlayback(page, profile, manifestInterception, {
+        const tuneResult = await establishChannelPlayback(page, profile, manifestInterception, {
 
-        initOptions: { persistResolution: options.persistResolution, requestedUrl: navigationUrl, skipChannelSelection: usedDirectUrl },
+          initOptions: { persistResolution: options.persistResolution, requestedUrl: navigationUrl, skipChannelSelection: usedDirectUrl },
 
-        // Navigate with retry. The configured navigationTimeout bounds each page load, and retryOperation reloads the page on genuine navigation failures. The
-        // retry ladder is this path's own policy, kept separate from channel selection so its timeout does not race the internal click retry loops
-        // in channel selection strategies (guideGrid can take 15-20 seconds for binary search + click retries).
-        navigate: async (): Promise<void> => {
+          // Navigate with retry. The configured navigationTimeout bounds each page load, and retryOperation reloads the page on genuine navigation failures. The
+          // retry ladder is this path's own policy, kept separate from channel selection so its timeout does not race the internal click retry loops
+          // in channel selection strategies (guideGrid can take 15-20 seconds for binary search + click retries).
+          navigate: async (): Promise<void> => {
 
-          await retryOperation({
+            await retryOperation({
 
-            backoffJitter: CONFIG.recovery.backoffJitter,
-            description: "page navigation for " + navigationUrl,
-            maxAttempts: CONFIG.streaming.maxNavigationRetries,
-            maxBackoffDelay: CONFIG.recovery.maxBackoffDelay,
-            operation: async (): Promise<void> => {
+              backoffJitter: CONFIG.recovery.backoffJitter,
+              description: "page navigation for " + navigationUrl,
+              maxAttempts: CONFIG.streaming.maxNavigationRetries,
+              maxBackoffDelay: CONFIG.recovery.maxBackoffDelay,
+              operation: async (): Promise<void> => {
 
-              await navigateToPage(page, navigationUrl, profile);
-            },
-            shouldAbort: () => page.isClosed(),
-            timeoutMs: CONFIG.streaming.navigationTimeout
-          });
-        }
-      });
+                await navigateToPage(page, navigationUrl, profile);
+              },
+              shouldAbort: () => page.isClosed(),
+              timeoutMs: CONFIG.streaming.navigationTimeout
+            });
+          }
+        });
 
-      strategyDirectTune = tuneResult.directTune ?? false;
-      context = tuneResult.context;
-    } else {
+        strategyDirectTune = tuneResult.directTune ?? false;
+        context = tuneResult.context;
+      } else {
 
-      await page.goto(url);
+        await page.goto(url);
 
-      // A static capture navigates once and takes the page as-is, with no channel selection or video wait, so it never reaches the tune path's overlay poll. Launch
-      // a bounded staticCapture poll so a cookie banner or per-site modal is dismissed on the captured page. There is no controller: the phase's window bounds it and
-      // a closed page stops it via the tick-error taxonomy. Any dismissal click lands in the captured pixels, which is exactly the intent for a static capture.
-      void deps.startOverlayHandling(page, profile, { phase: "staticCapture" });
+        // A static capture navigates once and takes the page as-is, with no channel selection or video wait, so it never reaches the tune path's overlay poll. Launch
+        // a bounded staticCapture poll so a cookie banner or per-site modal is dismissed on the captured page. There is no controller: the phase's window bounds it and
+        // a closed page stops it via the tick-error taxonomy. Any dismissal click lands in the captured pixels, which is exactly the intent for a static capture.
+        void deps.startOverlayHandling(page, profile, { phase: "staticCapture" });
 
-      context = page;
-    }
-  } catch(error) {
+        context = page;
+      }
+    } catch(error) {
 
-    // If a direct watch URL was used, offer the failure to the cache coordinator, which evicts the live and persisted hints when the failure is evidence against
-    // the URL and reports that verdict back. The retention policy lives there and is read from there - this file never re-derives which failures count.
-    const urlEvidence = usedDirectUrl && invalidateDirectUrl(profile, error);
+      // If a direct watch URL was used, offer the failure to the cache coordinator, which evicts the live and persisted hints when the failure is evidence against
+      // the URL and reports that verdict back. The retention policy lives there and is read from there - this file never re-derives which failures count.
+      const urlEvidence = usedDirectUrl && invalidateDirectUrl(profile, error);
 
-    // Window presentation is deliberately left alone here. The failing stream's registry entry is still registered in capture mode at this point, so the policy
-    // would read capture-active and hold the window on screen anyway; the terminate path that tears the entry down is the moment that genuinely settles it.
-    // Resource teardown (capture session, interceptor, page) is handled by the DisposableStack as this throw unwinds the function scope; the capture session
-    // disposes first, destroying the capture stream before the page closes, so STOP_RECORDING ordering is preserved.
+      // Window presentation is deliberately left alone here. The failing stream's registry entry is still registered in capture mode at this point, so the policy
+      // would read capture-active and hold the window on screen anyway; the terminate path that tears the entry down is the moment that genuinely settles it.
+      // Resource teardown (capture session, interceptor, page) is handled by the DisposableStack as this throw unwinds the function scope; the capture session
+      // disposes first, destroying the capture stream before the page closes, so STOP_RECORDING ordering is preserved.
 
-    /* A failure the coordinator blamed on the URL is worth one more attempt down the guide path, so it leaves this function typed for setupStream to act on. An
+      /* A failure the coordinator blamed on the URL is worth one more attempt down the guide path, so it leaves this function typed for setupStream to act on. An
      * establishment timeout qualifies: the retry is a whole fresh invocation, so there is no abandoned first attempt still driving a page, no one-shot manifest
      * interception handle to reuse, and no direct-tune marker to reset - the retry gets its own page, handle, and markers, which is exactly what a fresh tune
      * would get. Page-death and abort failures, the ones the retention policy keeps the URL for, rethrow raw: nothing about them says the URL is wrong.
      */
-    if(urlEvidence) {
+      if(urlEvidence) {
 
-      throw new DirectUrlEstablishmentError(error);
-    }
+        throw new DirectUrlEstablishmentError(error);
+      }
 
-    /* Classification sits below that branch, on the standing attempt, and not above it. A failure that leaves this function typed is not a verdict on the
+      /* Classification sits below that branch, on the standing attempt, and not above it. A failure that leaves this function typed is not a verdict on the
      * establishment at all - it is a request for one more attempt - and the attempt that follows raises its own failure through this same catch. Classifying
      * above the branch would hand the readiness detector both of them for a single logical setup, which is one setup speaking twice about one browser's fate.
      * The establishment timeout is exactly the shape where that matters, because it is both a failure the URL can be blamed for and one that carries a
@@ -1009,40 +1012,44 @@ export async function createPageWithCapture(options: CreatePageWithCaptureOption
      * The verdict is started here and not waited on. A failure this far in has already spent a navigation and a channel selection, so a second whole tune would
      * double the client's wait for something no verdict can change: the capture start, the one step a fresh browser would do differently, already succeeded.
      */
-    void deps.awaitCaptureVerdict(error);
+      void deps.awaitCaptureVerdict(error);
 
-    throw error;
-  }
+      throw error;
+    }
 
-  /* Both establishment branches join here, which is why the re-affirmation sits at this point: capture acquisition selects this tab for the length of the start
+    /* Both establishment branches join here, which is why the re-affirmation sits at this point: capture acquisition selects this tab for the length of the start
    * and hands the selection back, and a tune of a fullscreen-activating profile selects it again for its fullscreen sequence and hands it back once more.
    * Re-issuing the page's own declared metrics is what leaves the capture composing the emulated surface rather than the window's fitted view of it, whatever the
    * establishment did with the selection.
    */
-  await deps.reaffirmCaptureSurface(page);
+    await deps.reaffirmCaptureSurface(page);
 
-  // Re-settle the window now that the page is established, handing the sync the page it should use for the CDP session. Navigation activates the window on macOS,
-  // so a pass here settles it against the policy after the tune, as every other transition does.
-  await deps.syncWindowVisibility(page);
+    // Re-settle the window now that the page is established, handing the sync the page it should use for the CDP session. Navigation activates the window on macOS,
+    // so a pass here settles it against the policy after the tune, as every other transition does.
+    await deps.syncWindowVisibility(page);
 
-  LOG.debug("timing:startup", "Page with capture ready. Total: %sms.", captureElapsed());
+    LOG.debug("timing:startup", "Page with capture ready. Total: %sms.", captureElapsed());
 
-  // Success: transfer ownership of the page, interceptor, and capture session out of the scope guard. move() empties the stack so its scope-exit disposal is a no-op
-  // and the caller becomes responsible for disposing what it now holds.
-  resources.move();
+    // Success: transfer ownership of the page, interceptor, and capture session out of the scope guard. move() empties the stack so its scope-exit disposal is a no-op
+    // and the caller becomes responsible for disposing what it now holds.
+    resources.move();
 
-  return {
+    return {
 
-    captureSession,
-    context,
+      captureSession,
+      context,
 
-    // The kind the interception is finalized against, derived by the shared formula from this path's tune facts and the profile.
-    directTune: computeDirectTuneKind({ profile, strategyDirectTune, usedDirectUrl }),
+      // The kind the interception is finalized against, derived by the shared formula from this path's tune facts and the profile.
+      directTune: computeDirectTuneKind({ profile, strategyDirectTune, usedDirectUrl }),
 
-    emeInterceptor,
-    manifestInterception,
-    page
-  };
+      emeInterceptor,
+      manifestInterception,
+      page
+    };
+  } finally {
+
+    resources.dispose();
+  }
 }
 
 // URL Redirect Resolution.
@@ -1510,12 +1517,18 @@ export async function setupStream(options: StreamSetupOptions, onCircuitBreak: (
     // Check if YouTube TV provided a direct HLS manifest via InnerTube API.
     // This bypasses the need for manifest interception since we already have the HLS URL.
     let directHlsManifest: Nullable<string> = null;
+
     if(!manifestInterception) {
+
       directHlsManifest = await page.evaluate((): string | null => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return (window as any).__prismcast_direct_hls_manifest ?? null;
+
+        const manifest: unknown = Reflect.get(window, "__prismcast_direct_hls_manifest");
+
+        return typeof manifest === "string" ? manifest : null;
       });
+
       if(directHlsManifest) {
+
         LOG.info("streaming:setup", "Using direct HLS manifest from YouTube TV InnerTube API: %s.", directHlsManifest);
       }
     }
@@ -1525,96 +1538,103 @@ export async function setupStream(options: StreamSetupOptions, onCircuitBreak: (
     // first, but its disposal is a CDP observer detach with no ordering dependency on either peer; the pair that must stay ordered is capture-session-before-page,
     // so the capture stream is destroyed and STOP_RECORDING fires while the browser is still connected, ahead of the page close. On success we move() the guard and
     // hand ownership to the cleanup closure (and, once the session is installed on the registry entry, to terminateStream).
-    using owned = new DisposableStack();
+    const owned = new DisposableStack();
 
-    owned.adopt(page, disposePage);
-    owned.use(captureSession);
+    try {
 
-    if(manifestInterception) {
+      owned.adopt(page, disposePage);
+      owned.use(captureSession);
 
-      owned.use(manifestInterception);
-    }
-    // Tune verification. The shared adjudication stage finalizes the manifest interceptor and confirms the captured master manifest URL belongs to the channel
-    // that was just tuned. This step makes setupStream "verified by construction" - every consumer of StreamSetupResult (HLS preroll, HLS blocking, MPEG-TS,
-    // native proxy, capture mode) receives a stream guaranteed to be on the requested channel without having to opt in or coordinate. Streams with no manifest
-    // interception at all (a channel locked to screen capture, a DRM-cached binding, or an install that failed) have nothing to adjudicate and skip the step
-    // entirely; verifyManifestSelection owns which of the remaining ones it can speak to. A failure reason throws StreamSetupError so the existing failure path
-    // marks channel health, terminates the pending registry entry, and surfaces a clear error - never silently delivers the wrong channel. The scope guard disposes
-    // the capture session, interceptor, and page as the throw unwinds.
-    if(manifestInterception) {
+      if(manifestInterception) {
 
-      const verifyError = await adjudicateChannelSelection(manifestInterception, profile, directTune);
-
-      if(verifyError) {
-
-        const failureLabel = channel?.name ?? channelName ?? url;
-
-        throw new StreamSetupError("Tune verification failed: " + verifyError, 502,
-          withSignInGuidance("Tune verification failed for " + failureLabel + ". " + verifyError, channelName, serviceName));
-      }
-    }
-
-    // Monitor stream info for status updates. The serviceTag enables service-specific monitoring flags (e.g., tinySegmentEvidenceSeconds).
-    const monitorStreamInfo: MonitorStreamInfo = {
-
-      channelName: channel?.name ?? null,
-      numericStreamId,
-      serviceName,
-      serviceTag: getDomainConfig(url)?.serviceTag,
-      settings,
-      startTime
-    };
-
-    // Start the health monitor for this stream.
-    const monitor = monitorPlaybackHealth(page, context, profile, url, streamId, monitorStreamInfo, onCircuitBreak, onTabReplacement);
-
-    // Cleanup function. Releases all resources associated with the stream. Safe to call more than once. completeStreamSetup uses it as the fallback teardown
-    // when the pending entry is terminated before the capture session is installed on it; once installed, terminateStream disposes the same session (safe to
-    // call disposal more than once). Disposes the capture session (kill -> destroy -> stop) before closing the page so STOP_RECORDING fires while the browser is
-    // connected.
-    let cleanupCompleted = false;
-
-    const cleanup = async (): Promise<void> => {
-
-      if(cleanupCompleted) {
-
-        return;
+        owned.use(manifestInterception);
       }
 
-      cleanupCompleted = true;
+      // Tune verification. The shared adjudication stage finalizes the manifest interceptor and confirms the captured master manifest URL belongs to the channel
+      // that was just tuned. This step makes setupStream "verified by construction" - every consumer of StreamSetupResult (HLS preroll, HLS blocking, MPEG-TS,
+      // native proxy, capture mode) receives a stream guaranteed to be on the requested channel without having to opt in or coordinate. Streams with no manifest
+      // interception at all (a channel locked to screen capture, a DRM-cached binding, or an install that failed) have nothing to adjudicate and skip the step
+      // entirely; verifyManifestSelection owns which of the remaining ones it can speak to. A failure reason throws StreamSetupError so the existing failure path
+      // marks channel health, terminates the pending registry entry, and surfaces a clear error - never silently delivers the wrong channel. The scope guard disposes
+      // the capture session, interceptor, and page as the throw unwinds.
+      if(manifestInterception) {
 
-      monitor.dispose();
-      captureSession.dispose();
-      disposePage(page);
+        const verifyError = await adjudicateChannelSelection(manifestInterception, profile, directTune);
 
-      // Settle the window against the policy now that this stream's resources are gone.
-      await deps.syncWindowVisibility();
-    };
+        if(verifyError) {
 
-    // Success: transfer ownership out of the scope guard. The cleanup closure and, once the session is installed on the registry entry, terminateStream become
-    // responsible for disposing the page and capture session; the interceptor, already finalized and verified above, continues into the native upgrade.
-    owned.move();
+          const failureLabel = channel?.name ?? channelName ?? url;
 
-    // Return the setup result.
-    return {
+          throw new StreamSetupError("Tune verification failed: " + verifyError, 502,
+            withSignInGuidance("Tune verification failed for " + failureLabel + ". " + verifyError, channelName, serviceName));
+        }
+      }
 
-      captureSession,
-      channelName: channel?.name ?? null,
-      cleanup,
-      directTune,
-      emeInterceptor: captureResult.emeInterceptor,
-      manifestInterception,
-      monitor,
-      numericStreamId,
-      page,
-      probeIdentity,
-      profile,
-      profileName,
-      serviceName,
-      streamId,
-      url,
-      directHlsManifest
-    };
+      // Monitor stream info for status updates. The serviceTag enables service-specific monitoring flags (e.g., tinySegmentEvidenceSeconds).
+      const monitorStreamInfo: MonitorStreamInfo = {
+
+        channelName: channel?.name ?? null,
+        numericStreamId,
+        serviceName,
+        serviceTag: getDomainConfig(url)?.serviceTag,
+        settings,
+        startTime
+      };
+
+      // Start the health monitor for this stream.
+      const monitor = monitorPlaybackHealth(page, context, profile, url, streamId, monitorStreamInfo, onCircuitBreak, onTabReplacement);
+
+      // Cleanup function. Releases all resources associated with the stream. Safe to call more than once. completeStreamSetup uses it as the fallback teardown
+      // when the pending entry is terminated before the capture session is installed on it; once installed, terminateStream disposes the same session (safe to
+      // call disposal more than once). Disposes the capture session (kill -> destroy -> stop) before closing the page so STOP_RECORDING fires while the browser is
+      // connected.
+      let cleanupCompleted = false;
+
+      const cleanup = async (): Promise<void> => {
+
+        if(cleanupCompleted) {
+
+          return;
+        }
+
+        cleanupCompleted = true;
+
+        monitor.dispose();
+        captureSession.dispose();
+        disposePage(page);
+
+        // Settle the window against the policy now that this stream's resources are gone.
+        await deps.syncWindowVisibility();
+      };
+
+      // Success: transfer ownership out of the scope guard. The cleanup closure and, once the session is installed on the registry entry, terminateStream become
+      // responsible for disposing the page and capture session; the interceptor, already finalized and verified above, continues into the native upgrade.
+      owned.move();
+
+      // Return the setup result.
+      return {
+
+        captureSession,
+        channelName: channel?.name ?? null,
+        cleanup,
+        directHlsManifest,
+        directTune,
+        emeInterceptor: captureResult.emeInterceptor,
+        manifestInterception,
+        monitor,
+        numericStreamId,
+        page,
+        probeIdentity,
+        profile,
+        profileName,
+        serviceName,
+        streamId,
+        url
+      };
+    } finally {
+
+      owned.dispose();
+    }
   });
 }
 
@@ -1676,8 +1696,8 @@ export async function reestablishChannelManifest(options: ReestablishChannelMani
       // the observer has to outlive that allowance and every step after it.
       const budgetMs = establishmentBudgetMs(CONFIG.streaming.navigationTimeout);
 
-      // Scope-bind the interceptor with "using" so its CDP observer is disposed on every exit from this function, including the early returns below.
-      using handle = await installManifestInterceptor(page, budgetMs);
+      // The interceptor is disposed on every exit from this function, including the early returns below.
+      const handle = await installManifestInterceptor(page, budgetMs);
 
       if(!handle) {
 
@@ -1686,50 +1706,56 @@ export async function reestablishChannelManifest(options: ReestablishChannelMani
         return null;
       }
 
-      // Establish the channel through the shared composition: navigate, stamp the observation epoch - which fences anything the reloaded page auto-played so it
-      // cannot win adjudication over the channel the selection lands on - then run playback initialization under the same bound the tune path uses.
-      const tuneResult = await establishChannelPlayback(page, profile, handle, {
+      try {
 
-        initOptions: { requestedUrl: url },
+        // Establish the channel through the shared composition: navigate, stamp the observation epoch - which fences anything the reloaded page auto-played so it
+        // cannot win adjudication over the channel the selection lands on - then run playback initialization under the same bound the tune path uses.
+        const tuneResult = await establishChannelPlayback(page, profile, handle, {
 
-        // Navigate through the profile's own wait strategy, single-attempt by design. A navigation failure throws to the catch below and normalizes to null.
-        navigate: async (): Promise<void> => {
+          initOptions: { requestedUrl: url },
 
-          await navigateToPage(page, url, profile);
-        },
+          // Navigate through the profile's own wait strategy, single-attempt by design. A navigation failure throws to the catch below and normalizes to null.
+          navigate: async (): Promise<void> => {
 
-        // Restore the page's mute when the initialization settles. Playback establishment unmutes by direct property write, so an element that is already
-        // playing stays audible until it is re-muted, and attaching the restore to the settlement is what covers every outcome rather than only the happy one.
-        onInitSettled: (): void => {
+            await navigateToPage(page, url, profile);
+          },
 
-          void muteExistingVideos(page);
+          // Restore the page's mute when the initialization settles. Playback establishment unmutes by direct property write, so an element that is already
+          // playing stays audible until it is re-muted, and attaching the restore to the settlement is what covers every outcome rather than only the happy one.
+          onInitSettled: (): void => {
+
+            void muteExistingVideos(page);
+          }
+        });
+
+        // Adjudicate against this route's facts: the kind formula gets no cached-direct-URL term here, because the route above never takes one.
+        const verifyError = await adjudicateChannelSelection(handle, profile, computeDirectTuneKind({ profile, strategyDirectTune: tuneResult.directTune ?? false }));
+
+        // On a verifier-bearing master path the adjudication has already awaited this promise; on the vacuous path this await is the one that waits out the
+        // finalize settle. Reading it before the verification result is contract rather than preference: an establishment that intercepted nothing has to report
+        // exactly that, and the verification gates raise no objection for a null interception anyway, so the check order is what keeps each warning accurate to
+        // its own outcome.
+        const interception = await handle.promise;
+
+        if(!interception) {
+
+          LOG.warn("The channel for %s could not be re-established: no manifest was intercepted.", channelName ?? url);
+
+          return null;
         }
-      });
 
-      // Adjudicate against this route's facts: the kind formula gets no cached-direct-URL term here, because the route above never takes one.
-      const verifyError = await adjudicateChannelSelection(handle, profile, computeDirectTuneKind({ profile, strategyDirectTune: tuneResult.directTune ?? false }));
+        if(verifyError) {
 
-      // On a verifier-bearing master path the adjudication has already awaited this promise; on the vacuous path this await is the one that waits out the
-      // finalize settle. Reading it before the verification result is contract rather than preference: an establishment that intercepted nothing has to report
-      // exactly that, and the verification gates raise no objection for a null interception anyway, so the check order is what keeps each warning accurate to
-      // its own outcome.
-      const interception = await handle.promise;
+          LOG.warn("The re-established channel for %s did not verify: %s", channelName ?? url, verifyError);
 
-      if(!interception) {
+          return null;
+        }
 
-        LOG.warn("The channel for %s could not be re-established: no manifest was intercepted.", channelName ?? url);
+        return interception;
+      } finally {
 
-        return null;
+        handle.dispose();
       }
-
-      if(verifyError) {
-
-        LOG.warn("The re-established channel for %s did not verify: %s", channelName ?? url, verifyError);
-
-        return null;
-      }
-
-      return interception;
     } catch(error) {
 
       LOG.warn("The channel for %s could not be re-established: %s.", channelName ?? url, formatError(error));

@@ -352,8 +352,10 @@ describe("acquireCaptureStream", () => {
 
     await acquireCaptureStream(page.page, OPTIONS, { clock, deps: makeDeps(extension, server) });
 
+    const modifier = (process.platform === "darwin") ? "Meta" : "Control";
+
     assert.deepEqual(timeline,
-      [ "ready", "select", "handler:on", "reassert", "down:Meta", "down:Shift", "press:KeyY", "up:Shift", "up:Meta", "start", "release" ],
+      [ "ready", "select", "handler:on", "reassert", "down:" + modifier, "down:Shift", "press:KeyY", "up:Shift", "up:" + modifier, "start", "release" ],
       "readiness, then the selection, the attempt's handler and its re-assert, the grant keys in order, the start, and only then the give-back");
     assert.ok(timeline.indexOf("handler:on") < timeline.indexOf("start"), "the socket handler is registered before the extension is ever invoked");
 

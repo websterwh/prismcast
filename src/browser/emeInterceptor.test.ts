@@ -39,36 +39,48 @@ test("EME Interceptor: Page Hook Installation", async (t) => {
 
     const { exposedFunctions, injectedScripts, page } = createMockPage();
 
-    using handle = await installEmeInterceptor(page);
+    const handle = await installEmeInterceptor(page);
 
-    assert.ok(handle, "Handle should be returned");
-    assert.ok(exposedFunctions.has("__prismcast_resign_challenge"), "Should expose challenge resign hook");
-    assert.ok(exposedFunctions.has("__prismcast_on_license"), "Should expose license notification hook");
-    assert.equal(injectedScripts.length, 1, "Should inject 1 script via evaluateOnNewDocument");
-    assert.match(injectedScripts[0]!, /MediaKeySession\.prototype\.addEventListener/, "Script should wrap addEventListener");
+    try {
+
+      assert.ok(handle, "Handle should be returned");
+      assert.ok(exposedFunctions.has("__prismcast_resign_challenge"), "Should expose challenge resign hook");
+      assert.ok(exposedFunctions.has("__prismcast_on_license"), "Should expose license notification hook");
+      assert.equal(injectedScripts.length, 1, "Should inject 1 script via evaluateOnNewDocument");
+      assert.match(injectedScripts[0]!, /MediaKeySession\.prototype\.addEventListener/, "Script should wrap addEventListener");
+    } finally {
+
+      handle[Symbol.dispose]();
+    }
   });
 
   await t.test("waitForKeys resolves when license callback emits keys", async () => {
 
     const { exposedFunctions, page } = createMockPage();
 
-    using handle = await installEmeInterceptor(page);
+    const handle = await installEmeInterceptor(page);
 
-    const onLicense = exposedFunctions.get("__prismcast_on_license");
+    try {
 
-    assert.ok(onLicense, "onLicense should be registered");
+      const onLicense = exposedFunctions.get("__prismcast_on_license");
 
-    // Start waiting for keys
-    const waitPromise = handle.waitForKeys(1000);
+      assert.ok(onLicense, "onLicense should be registered");
 
-    // Simulate key notification directly into handle's callback path
-    // In our test, parseLicense would fail on dummy data, but we can verify the timeout logic:
-    await assert.rejects(
-      async () => {
+      // Start waiting for keys
+      const waitPromise = handle.waitForKeys(1000);
 
-        await waitPromise;
-      },
-      /Timed out waiting for DRM keys/
-    );
+      // Simulate key notification directly into handle's callback path
+      // In our test, parseLicense would fail on dummy data, but we can verify the timeout logic:
+      await assert.rejects(
+        async () => {
+
+          await waitPromise;
+        },
+        /Timed out waiting for DRM keys/
+      );
+    } finally {
+
+      handle[Symbol.dispose]();
+    }
   });
 });

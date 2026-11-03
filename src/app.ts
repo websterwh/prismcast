@@ -2,6 +2,7 @@
  *
  * app.ts: Express application builder for PrismCast.
  */
+import "homebridge-plugin-utils/polyfills";
 import { CONFIG, displayConfiguration, initializeConfiguration, validateConfiguration } from "./config/index.ts";
 import type { ChangeRejection, ConfigChange } from "./config/reactivity.ts";
 import type { Config, LoggingConfig, Nullable } from "./types/index.ts";

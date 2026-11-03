@@ -8,14 +8,15 @@
  * authentication) to obtain HLS manifests that can be streamed directly via the
  * native proxy with Widevine decryption.
  */
-import type { Page } from "puppeteer-core";
 import { LOG, evaluateWithAbort } from "../utils/index.ts";
 import type { Nullable } from "../types/index.ts";
+import type { Page } from "puppeteer-core";
 
 /**
  * Result of querying YouTube TV's InnerTube API for a live channel's HLS manifest.
  */
 export interface YouTubeTvHlsManifest {
+
   /** The HLS master playlist URL. */
   hlsManifestUrl: string;
   /** The channel's playback token (vp parameter). */
@@ -32,88 +33,93 @@ export interface YouTubeTvHlsManifest {
  * @returns The HLS manifest information, or null if not available.
  */
 export async function queryYouTubeTvHlsManifest(page: Page): Promise<Nullable<YouTubeTvHlsManifest>> {
-  // First, extract the playback token from the current URL
-  const urlResult = await evaluateWithAbort(page, (): { videoId: string; playbackToken: string } | null => {
-    const url = window.location.href;
-    const match = url.match(/\/watch\/([^?]+)\?vp=([^&]+)/);
-    if (!match) {
-      return null;
-    }
-    return { videoId: match[1]!, playbackToken: match[2]! };
-  });
 
-  if (!urlResult) {
-    LOG.debug("youtubeTvDirect", "Could not extract videoId and playbackToken from URL");
+  if(typeof page.url !== "function") {
+
+    return null;
+  }
+  const url = page.url();
+  const match = /\/watch\/([^?]+)\?vp=([^&]+)/.exec(url);
+
+  if(!match) {
+
+    LOG.debug("tuning:yttv", "Could not extract videoId and playbackToken from URL.");
+
     return null;
   }
 
-  const { videoId, playbackToken } = urlResult;
+  const videoId = match[1];
+  const playbackToken = match[2];
+
+  if(!videoId || !playbackToken) {
+
+    return null;
+  }
+  const urlResult = { playbackToken, videoId };
 
   // Query InnerTube API from browser context with iOS client to get HLS manifest
   const innerTubeResult = await evaluateWithAbort(page, async (params: { videoId: string; playbackToken: string }): Promise<YouTubeTvHlsManifest | null> => {
+
     try {
+
       const response = await fetch("https://tv.youtube.com/youtubei/v1/player", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
+
         body: JSON.stringify({
+
           context: {
+
             client: {
+
+              clientFormFactor: "MOBILE",
               clientName: "IOS",
               clientVersion: "19.40.3",
-              hl: "en",
-              gl: "US",
               deviceMake: "Apple",
               deviceModel: "iPhone15,2",
-              userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-              clientFormFactor: "MOBILE",
-              platform: "MOBILE"
+              gl: "US",
+              hl: "en",
+              platform: "MOBILE",
+              userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
             }
           },
-          videoId: params.videoId,
           playbackContext: {
+
             contentPlaybackContext: {
+
               html5Preference: "HTML5_PREF_WANTS",
               lactMilliseconds: "-1"
             }
-          }
-        })
+          },
+          videoId: params.videoId
+        }),
+        credentials: "include",
+        headers: {
+
+          "Content-Type": "application/json"
+        },
+        method: "POST"
       });
 
-      const data = await response.json();
-      const streamingData = data.streamingData || {};
+      const data = (await response.json()) as { streamingData?: { hlsManifestUrl?: string } };
+      const streamingData = data.streamingData ?? {};
 
-      if (!streamingData.hlsManifestUrl) {
+      if(!streamingData.hlsManifestUrl) {
+
         return null;
       }
 
       return {
+
         hlsManifestUrl: streamingData.hlsManifestUrl,
         playbackToken: params.playbackToken,
         videoId: params.videoId
       };
-    } catch (e) {
-      console.warn("[PrismCast YouTube TV Direct] InnerTube request failed:", e);
+    } catch {
+
       return null;
     }
   }, [urlResult]);
 
   return innerTubeResult;
-}
-
-/**
- * Checks if the current page is a YouTube TV watch page that supports direct HLS streaming.
- *
- * @param page - The Puppeteer page object.
- * @returns True if the page is a YouTube TV watch page with a valid playback token.
- */
-export async function isYouTubeTvWatchPage(page: Page): Promise<boolean> {
-  return evaluateWithAbort(page, (): boolean => {
-    const url = window.location.href;
-    return /^https:\/\/tv\.youtube\.com\/watch\/[^?]+\?vp=/.test(url);
-  });
 }
 
 /**
@@ -125,10 +131,15 @@ export async function isYouTubeTvWatchPage(page: Page): Promise<boolean> {
  * @returns The HLS manifest URL if available, or null.
  */
 export async function attemptDirectHlsManifest(page: Page): Promise<Nullable<string>> {
+
   const manifest = await queryYouTubeTvHlsManifest(page);
-  if (manifest?.hlsManifestUrl) {
-    LOG.info("youtubeTvDirect", "Found HLS manifest for YouTube TV channel: %s", manifest.hlsManifestUrl);
+
+  if(manifest?.hlsManifestUrl) {
+
+    LOG.info("Found HLS manifest for YouTube TV channel: %s.", manifest.hlsManifestUrl);
+
     return manifest.hlsManifestUrl;
   }
+
   return null;
 }

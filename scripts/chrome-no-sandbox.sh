@@ -27,7 +27,7 @@ if [[ -n "$SCREEN_WIDTH" && -n "$SCREEN_HEIGHT" ]]; then
 fi
 gpu_flags=()
 vgl_wrapper=()
-if [ "$PRISMCAST_USE_NVIDIA" = "1" ] || [ -e /dev/nvidia0 ] || command -v nvidia-smi >/dev/null 2>&1; then
+if [ -x /opt/VirtualGL/bin/vglrun ] && { [ "$PRISMCAST_USE_NVIDIA" = "1" ] || [ -e /dev/nvidia0 ] || command -v nvidia-smi >/dev/null 2>&1; }; then
     # Keep Chrome on ANGLE-over-desktop-GL (ordinary GLX calls) rather than native EGL. Xvfb's own GLX has no GPU
     # behind it and would resolve these calls to Mesa's software llvmpipe - the point of vglrun below is that it
     # intercepts these exact GLX calls via LD_PRELOAD before Xvfb ever sees them and redirects the rendering to the

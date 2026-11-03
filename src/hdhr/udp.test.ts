@@ -5,8 +5,8 @@
  *   1. selectLanAddress is exercised as a pure function against synthetic NetworkInterfaceInfo maps so the subnet-match and fallback logic is verified without
  *      relying on the host's actual interface configuration.
  *
- *   2. The UdpSurface node is exercised via dgram loopback on an ephemeral port: each test creates a surface with `await using` (so its [Symbol.asyncDispose]
- *      tears the socket down at scope exit), binds the responder on 127.0.0.1:0 with a provider standing in for the HTTP surface's bound port, sends a Discover
+ *   2. The UdpSurface node is exercised via dgram loopback on an ephemeral port: each test tracks its responder and closes it in afterEach, binds the responder
+ *      on 127.0.0.1:0 with a provider standing in for the HTTP surface's bound port, sends a Discover
  *      request, and asserts that a structurally valid reply comes back. The full request-reply round-trip validates the entire path - parser, dispatcher,
  *      encoder, and socket send - and the reply's BaseURL is decoded against a configured HDHR port held apart from the provider's, and against a provider
  *      whose port moves between requests, so each reply is shown to read the provider when its request arrives.
@@ -25,7 +25,7 @@
  *      change it.
  *
  * The integration tests run on 127.0.0.1 with an ephemeral port so they cannot collide with a real HDHomeRun device or another emulator on the developer's
- * host. `await using` disposal tears the responder down at the end of each test, so there is no afterEach to forget. Request packet builders (makeDiscoverRequest,
+ * host. afterEach tears every responder down at the end of its test. Request packet builders (makeDiscoverRequest,
  * makeGetRequest), the shared framing helper (sealPacket), the datagram exchange (sendAndReceive) and the BaseURL reader (readBaseUrl) come from
  * protocol.helpers.ts so every HDHomeRun test speaks and reads the same wire format.
  */
@@ -33,7 +33,7 @@ import { CONFIG, initializeConfiguration } from "../config/index.ts";
 import { HDHR_DISCOVERY_PORT, createUdpSurface, selectLanAddress } from "./udp.ts";
 import { PACKET_DISCOVER_REPLY, PACKET_GET_REPLY, PACKET_UPGRADE_REQUEST, TLV_BASE_URL, TLV_DEVICE_ID, TLV_DEVICE_TYPE, TLV_ERROR, TLV_GETSET_NAME,
   TLV_GETSET_VALUE, TLV_TUNER_COUNT } from "./protocol.ts";
-import { describe, test } from "node:test";
+import { afterEach, describe, test } from "node:test";
 import { makeDiscoverRequest, makeGetRequest, readBaseUrl, sealPacket, sendAndReceive } from "./protocol.helpers.ts";
 import type { ConfigStore } from "../config/index.ts";
 import { HDHR_DEVICE_TYPE_TUNER } from "./identity.ts";
@@ -44,6 +44,19 @@ import { SEEDED_DEVICE_ID } from "../config/index.helpers.ts";
 import type { UdpSurface } from "./udp.ts";
 import assert from "node:assert/strict";
 import { subscribeToLogs } from "../utils/logEmitter.ts";
+const surfaces: UdpSurface[] = [];
+
+afterEach(async () => {
+
+  await Promise.all(surfaces.splice(0).map((surface) => surface.ensureDown()));
+});
+
+function trackSurface(surface: UdpSurface): UdpSurface {
+
+  surfaces.push(surface);
+
+  return surface;
+}
 
 // The HTTP port the round-trip responders advertise. Nothing binds it: the controller hands a responder the HTTP surface's bound port through a provider, and
 // these rows hand it this value the same way.
@@ -143,7 +156,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("Discover request elicits a Discover reply with the four required TLVs", async () => {
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
     const failure = await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
     assert.equal(failure, null);
@@ -181,7 +194,7 @@ describe("UdpSurface - round-trip", () => {
 
     assert.equal(CONFIG.hdhr.port, HTTP_PORT + 1, "precondition: CONFIG names a port other than the provider's");
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -197,7 +210,7 @@ describe("UdpSurface - round-trip", () => {
     // and a provider that reports no port leaves the next request unanswered.
     let httpPort: Nullable<number> = HTTP_PORT;
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider: () => httpPort, port: 0 });
 
@@ -219,7 +232,7 @@ describe("UdpSurface - round-trip", () => {
 
     // The controller brings discovery down before the HTTP surface, so a provider reporting no port means the HTTP surface is going away, and a reply then would
     // advertise a BaseURL with no listener behind it.
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider: () => null, port: 0 });
 
@@ -228,7 +241,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("Get request for /sys/version elicits a Get reply with name and value TLVs", async () => {
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -258,7 +271,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("Get request for an unknown key elicits an error reply", async () => {
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -287,7 +300,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("Set request is write-protected: a value-bearing request elicits an error reply", async () => {
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -325,7 +338,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("malformed packets are silently dropped (no reply at all)", async () => {
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -347,7 +360,7 @@ describe("UdpSurface - round-trip", () => {
 
     try {
 
-      await using surface = createUdpSurface();
+      const surface = trackSurface(createUdpSurface());
 
       await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -372,7 +385,7 @@ describe("UdpSurface - round-trip", () => {
 
     try {
 
-      await using surface = createUdpSurface();
+      const surface = trackSurface(createUdpSurface());
 
       await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -389,7 +402,7 @@ describe("UdpSurface - round-trip", () => {
 
     // The type check, exercised with a wildcard id so only the type can decide the outcome. PrismCast presents as a tuner; a request for any other device class
     // is not addressed to it.
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -400,7 +413,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("a valid but unsupported packet type (Upgrade) is dropped without a reply", async () => {
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -416,7 +429,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("repeat-safe ensureUp: calling it twice reports no failure without rebinding", async () => {
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
     const first = await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
     assert.equal(first, null);
@@ -432,7 +445,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("ensureDown closes the socket and is reusable: a later ensureUp rebinds", async () => {
 
-    await using surface = createUdpSurface();
+    const surface = trackSurface(createUdpSurface());
 
     await surface.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
@@ -451,7 +464,7 @@ describe("UdpSurface - round-trip", () => {
 
   test("a bind collision on the responder port resolves ensureUp with the port and the error at warn level without throwing", async () => {
 
-    await using first = createUdpSurface();
+    const first = trackSurface(createUdpSurface());
     const firstFailure = await first.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port: 0 });
 
     assert.equal(firstFailure, null, "the first surface binds the ephemeral port");
@@ -472,7 +485,7 @@ describe("UdpSurface - round-trip", () => {
     // handler treats as graceful "discovery unavailable": ensureUp resolves the failure, never throws or rejects, and the surface stays down so the HTTP HDHR
     // surface keeps working. Binding the first surface's actual ephemeral port keeps the collision deterministic without hard-coding a port that another host
     // process might already hold.
-    await using second = createUdpSurface();
+    const second = trackSurface(createUdpSurface());
     const secondFailure = await second.ensureUp({ bindAddress: "127.0.0.1", httpPortProvider, port });
 
     unsubscribe();

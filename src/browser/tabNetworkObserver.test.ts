@@ -333,40 +333,35 @@ describe("observeTabResponses", () => {
     assert.equal(sentAfterFirstDispose, sentAfterSecondDispose, "second dispose issues no additional CDP commands");
   });
 
-  test("the using keyword triggers disposal at scope exit (normal path)", async () => {
+  test("Symbol.dispose tears down the observer", async () => {
 
-    // TC39 explicit resource management end-to-end test. We acquire the observer with the using keyword inside a scoped block; at scope exit, Symbol.dispose
-    // must fire automatically and produce the same Network.disable as an explicit dispose() call. This validates that V8/Node's ERM machinery correctly invokes
-    // our disposer rather than just confirming the alias is wired up.
     const { root: rootSession } = buildFixture();
 
-    {
+    const observer = await observeTabResponses(makeFakeCdpPage(rootSession), { onResponse: noop });
 
-      using observer = await observeTabResponses(makeFakeCdpPage(rootSession), { onResponse: noop });
+    assert.ok(observer, "observer installed inside the using scope");
+    observer[Symbol.dispose]();
 
-      assert.ok(observer, "observer installed inside the using scope");
-    }
-
-    // Scope exit fires Symbol.dispose. The observable side effect is Network.disable on the root session.
     const networkDisable = rootSession.sent.find((c) => c.method === NETWORK_DISABLE);
 
-    assert.ok(networkDisable, "using-scope exit triggers Network.disable on the root session");
+    assert.ok(networkDisable, "Symbol.dispose triggers Network.disable on the root session");
   });
 
-  test("the using keyword triggers disposal even when the scope exits via thrown exception", async () => {
+  test("Symbol.dispose tears down the observer after an error", async () => {
 
-    // Exception-safety contract: TC39 ERM guarantees disposal even when the scope exits via throw, which is the only reason to prefer Symbol.dispose over an
-    // explicit dispose() call inside a finally block. The observer must tear down on the exception path the same way it tears down on the normal path.
     const { root: rootSession } = buildFixture();
 
-    await assert.rejects(async () => {
+    const observer = await observeTabResponses(makeFakeCdpPage(rootSession), { onResponse: noop });
 
-      using observer = await observeTabResponses(makeFakeCdpPage(rootSession), { onResponse: noop });
+    assert.ok(observer, "observer installed inside the using scope");
 
-      assert.ok(observer, "observer installed inside the using scope");
+    try {
 
       throw new Error("simulated failure inside the using scope");
-    }, /simulated failure/);
+    } catch {
+
+      observer[Symbol.dispose]();
+    }
 
     const networkDisable = rootSession.sent.find((c) => c.method === NETWORK_DISABLE);
 

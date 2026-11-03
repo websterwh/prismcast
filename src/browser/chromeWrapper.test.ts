@@ -32,7 +32,9 @@ test("Docker Chrome wrapper merges feature switches and preserves other argument
 
       assert.deepEqual(featureArgs, ["--enable-features=" + [ ...requiredFeatures, ...entry.expected ].join(",")]);
       assert.deepEqual(args.filter(arg => !arg.startsWith("--enable-features=")), [
-        "--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu-sandbox", "--ignore-gpu-blocklist", ...passthrough
+        "--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu-sandbox", "--ignore-gpu-blocklist",
+        "--enable-gpu-rasterization", "--enable-zero-copy",
+        ...passthrough
       ]);
     }
   } finally {
@@ -67,7 +69,7 @@ function writeWrapper(directory: string): string {
   const source = readFileSync(new URL("../../scripts/chrome-no-sandbox.sh", import.meta.url), "utf8");
 
   writeFileSync(fakeChrome, "#!/bin/bash\nprintf '%s\\0' \"$@\"\n", { mode: 0o755 });
-  assert.ok(source.includes("exec /usr/bin/google-chrome-stable "));
+  assert.ok(source.includes("/usr/bin/google-chrome-stable"));
   writeFileSync(wrapper, source.replace("/usr/bin/google-chrome-stable", "\"" + fakeChrome + "\""));
 
   return wrapper;

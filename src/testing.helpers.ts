@@ -20,6 +20,8 @@
  * Tests can import from this barrel for the common case, or from a specific submodule when they want to advertise the narrower dependency. Both styles work
  * because the barrel re-exports verbatim.
  */
+import "homebridge-plugin-utils/polyfills";
+
 export type { CapturedCdpCommand, CdpSessionListenerOp } from "./testing/cdp.helpers.ts";
 export type { CapturedLogLine, TestLogger } from "./testing/loggers.helpers.ts";
 export type { FakeExecFile, FakeExecFileResult } from "./testing/exec.helpers.ts";

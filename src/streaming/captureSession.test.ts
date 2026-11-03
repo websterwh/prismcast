@@ -187,18 +187,15 @@ describe("createCaptureSession - repeat safety", () => {
     assert.equal(rig.calls.stopCount, 1);
   });
 
-  test("disposes deterministically at scope exit via the using declaration", () => {
+  test("disposes deterministically through Symbol.dispose", () => {
 
     const rig = createRig();
+    const session = createCaptureSession({ ffmpegProcess: rig.ffmpegProcess, rawCaptureStream: rig.rawCaptureStream });
 
-    {
+    session.attachSegmenter(rig.segmenter);
 
-      using session = createCaptureSession({ ffmpegProcess: rig.ffmpegProcess, rawCaptureStream: rig.rawCaptureStream });
-
-      session.attachSegmenter(rig.segmenter);
-
-      assert.equal(session.disposed, false);
-    }
+    assert.equal(session.disposed, false);
+    session[Symbol.dispose]();
 
     assert.deepEqual(rig.calls.order, [ "kill", "destroy", "stop" ]);
   });

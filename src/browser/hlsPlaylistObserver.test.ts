@@ -363,40 +363,39 @@ describe("observeHlsPlaylists", () => {
     observer.dispose();
   });
 
-  test("the using keyword triggers disposal at scope exit (normal path)", async () => {
+  test("Symbol.dispose tears down the observer", async () => {
 
-    // End-to-end TC39 ERM contract: at scope exit, V8/Node invokes Symbol.dispose, which calls dispose(), which tears down the underlying tab observer. The
-    // observable side effect is Network.disable on the root CDP session, propagated by the tab observer's own disposal path.
+    // The observable side effect is Network.disable on the root CDP session, propagated by the tab observer's own disposal path.
     const connection = new FakeConnection();
     const rootSession = new FakeCdpSession(connection);
 
-    {
+    const observer = await observeHlsPlaylists(makeFakeCdpPage(rootSession), { logCategory: "test:hls", onPlaylist: noop });
 
-      using observer = await observeHlsPlaylists(makeFakeCdpPage(rootSession), { logCategory: "test:hls", onPlaylist: noop });
-
-      assert.ok(observer, "observer installed inside the using scope");
-    }
+    assert.ok(observer, "observer installed inside the using scope");
+    observer[Symbol.dispose]();
 
     const networkDisable = rootSession.sent.find((c) => c.method === "Network.disable");
 
-    assert.ok(networkDisable, "using-scope exit propagates Network.disable through to the root CDP session");
+    assert.ok(networkDisable, "Symbol.dispose propagates Network.disable through to the root CDP session");
   });
 
-  test("the using keyword triggers disposal even when the scope exits via thrown exception", async () => {
+  test("Symbol.dispose tears down the observer after an error", async () => {
 
-    // Exception-safety contract: TC39 ERM guarantees disposal on the throw path. Same expectation as on TabNetworkObserver - the HLS layer must propagate the
-    // guarantee to its underlying observer.
+    // The HLS layer must propagate disposal to its underlying observer after an error.
     const connection = new FakeConnection();
     const rootSession = new FakeCdpSession(connection);
 
-    await assert.rejects(async () => {
+    const observer = await observeHlsPlaylists(makeFakeCdpPage(rootSession), { logCategory: "test:hls", onPlaylist: noop });
 
-      using observer = await observeHlsPlaylists(makeFakeCdpPage(rootSession), { logCategory: "test:hls", onPlaylist: noop });
+    assert.ok(observer, "observer installed inside the using scope");
 
-      assert.ok(observer, "observer installed inside the using scope");
+    try {
 
       throw new Error("simulated failure inside the using scope");
-    }, /simulated failure/);
+    } catch {
+
+      observer[Symbol.dispose]();
+    }
 
     const networkDisable = rootSession.sent.find((c) => c.method === "Network.disable");
 

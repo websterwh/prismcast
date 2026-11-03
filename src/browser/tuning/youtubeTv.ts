@@ -577,17 +577,21 @@ async function youtubeGridStrategy(page: Page, profile: ChannelSelectionProfile)
   // Attempt to get direct HLS manifest from InnerTube API for native streaming.
   // If successful, the HLS manifest URL will be used by the native proxy instead of capture.
   try {
+
     const { attemptDirectHlsManifest } = await import("../youtubeTvDirect.ts");
     const hlsManifestUrl = await attemptDirectHlsManifest(page);
-    if (hlsManifestUrl) {
+
+    if(hlsManifestUrl) {
+
       // Store the direct HLS manifest URL in the page context for the streaming layer to use.
       await page.evaluate((url: string) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).__prismcast_direct_hls_manifest = url;
+
+        Reflect.set(window, "__prismcast_direct_hls_manifest", url);
       }, hlsManifestUrl);
       LOG.info("tuning:yttv", "YouTube TV channel %s will use direct HLS streaming via InnerTube.", channelName);
     }
-  } catch (error) {
+  } catch(error) {
+
     LOG.debug("tuning:yttv", "Direct HLS manifest query failed, falling back to capture: %s.", String(error));
   }
 

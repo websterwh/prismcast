@@ -1145,25 +1145,25 @@ export function correctCaptureValues(values: CaptureValues): CorrectedCapture {
     const configured = values.captureCodecs;
     const recognized = new Set<string>(RECOGNIZED_CODECS);
     const ignored = configured.filter((codec) => !recognized.has(codec));
-    const using = configured.filter((codec) => recognized.has(codec));
-    const restoresBaseline = !using.includes(CAPTURE_BASELINE_CODEC);
+    const inUse = configured.filter((codec) => recognized.has(codec));
+    const restoresBaseline = !inUse.includes(CAPTURE_BASELINE_CODEC);
 
     if(restoresBaseline) {
 
-      using.unshift(CAPTURE_BASELINE_CODEC);
+      inUse.unshift(CAPTURE_BASELINE_CODEC);
     }
 
     if(ignored.length > 0) {
 
-      corrections.push({ configured, ignored, kind: "unrecognizedCodecs", using });
+      corrections.push({ configured, ignored, kind: "unrecognizedCodecs", using: inUse });
     }
 
     if(restoresBaseline) {
 
-      corrections.push({ configured, kind: "baseline", using });
+      corrections.push({ configured, kind: "baseline", using: inUse });
     }
 
-    corrected.captureCodecs = using;
+    corrected.captureCodecs = inUse;
   }
 
   return { corrections, values: corrected };

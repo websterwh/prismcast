@@ -548,7 +548,7 @@ describe("buildMpegTsRemuxerArgs", () => {
 
   test("reads fragmented MP4 from stdin", () => {
 
-    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all");
 
     // The -f mp4 flag declares the input format before the -i flag.
     assert.deepEqual(args.slice(args.indexOf("-f"), args.indexOf("-f") + 2), [ "-f", "mp4" ]);
@@ -560,7 +560,7 @@ describe("buildMpegTsRemuxerArgs", () => {
 
   test("copies both video and audio without transcoding", () => {
 
-    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all");
     const copyIndex = args.indexOf("-c");
 
     assert.equal(args[copyIndex + 1], "copy");
@@ -568,7 +568,7 @@ describe("buildMpegTsRemuxerArgs", () => {
 
   test("emits MPEG-TS with ATSC-conventional service and PID conventions", () => {
 
-    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all");
 
     // Output container.
     assert.equal(args[args.lastIndexOf("-f") + 1], "mpegts");
@@ -583,9 +583,9 @@ describe("buildMpegTsRemuxerArgs", () => {
 
   test("adds the selected Annex B filter before MPEG-TS muxing", () => {
 
-    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all");
 
-    assert.equal(args[args.indexOf("-bsf:v") + 1], "h264_mp4toannexb");
+    assert.equal(args[args.indexOf("-bsf:v") + 1], "h264_mp4toannexb,dump_extra=freq=all");
   });
 
   test("omits a video bitstream filter when the source codec is unknown", () => {
@@ -597,7 +597,7 @@ describe("buildMpegTsRemuxerArgs", () => {
 
   test("ends with pipe:1 so output goes to stdout", () => {
 
-    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb");
+    const args = buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all");
 
     assert.equal(args.at(-1), "pipe:1");
   });
@@ -606,6 +606,6 @@ describe("buildMpegTsRemuxerArgs", () => {
 
     // The function is pure; consecutive calls produce structurally equal arrays. Tests assert this to lock the contract for production callers that may cache the
     // result locally.
-    assert.deepEqual(buildMpegTsRemuxerArgs("h264_mp4toannexb"), buildMpegTsRemuxerArgs("h264_mp4toannexb"));
+    assert.deepEqual(buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all"), buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all"));
   });
 });

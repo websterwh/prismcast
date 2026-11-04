@@ -170,8 +170,12 @@ export const SITE_PROFILES: Record<string, SiteProfile> = {
   // intercept keyboard events for their own controls, so the f key does nothing on them and the API is the mechanism a custom profile would reach for here.
   fullscreenApi: {
 
+    aggressiveFullscreenFirst: false,
     category: "api",
     description: "Base profile for sites whose player exposes the JavaScript fullscreen API.",
+    fullscreenKey: null,
+    fullscreenRetryDelay: 500,
+    fullscreenVerifyDelay: 200,
     summary: "Player exposes the fullscreen API"
   },
 
@@ -427,6 +431,9 @@ export function getRegisteredProviderModuleProfiles(): IterableIterator<[string,
 
 export const DEFAULT_SITE_PROFILE: ResolvedSiteProfile = {
 
+  // Default aggressive fullscreen flag for standard profiles.
+  aggressiveFullscreenFirst: false,
+
   // No channel selection - single-channel sites don't need it.
   channelSelection: { strategy: "none" },
 
@@ -445,8 +452,14 @@ export const DEFAULT_SITE_PROFILE: ResolvedSiteProfile = {
   // No fullscreen key - CSS styling fills the capture, so no keypress is sent.
   fullscreenKey: null,
 
+  // Default fullscreen retry delay for standard profiles.
+  fullscreenRetryDelay: 500,
+
   // No fullscreen button selector - a player's own fullscreen control is clicked only where a profile names one.
   fullscreenSelector: null,
+
+  // Default fullscreen verify delay for standard profiles.
+  fullscreenVerifyDelay: 200,
 
   // No overlay hiding - most sites don't have persistent overlays during fullscreen.
   hideSelector: null,

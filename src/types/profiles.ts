@@ -230,6 +230,15 @@ export interface SiteProfile {
   // Whether to use the JavaScript Fullscreen API instead of keyboard shortcuts. When true, we call video.requestFullscreen() or use the webkit-prefixed variant.
   // This is more reliable than keyboard shortcuts on some sites but may trigger browser permission prompts or be blocked by site CSP policies.
   useRequestFullscreen?: boolean;
+  // If true, skip the simple retry ladder and go directly to aggressive
+  // fullscreen on the first attempt. Useful for sites (like YouTube TV) where
+  // the fullscreen button click succeeds but native fullscreen verification
+  // fails multiple times before aggressive styling works.
+  aggressiveFullscreenFirst?: boolean;
+  // Override the delay (ms) between fullscreen verification attempts. Default is 500ms.
+  fullscreenRetryDelay?: number;
+  // Override the delay (ms) to wait after applying styles/triggering fullscreen before verifying. Default is 200ms.
+  fullscreenVerifyDelay?: number;
 
   // Whether to wait for network idle during page navigation. When true, page.goto() waits for the network to be idle (no requests for 500ms) before returning.
   // This ensures all JavaScript has finished loading and executing. Disable for sites that have persistent connections or polling that prevents network idle.
@@ -285,6 +294,12 @@ export interface ResolvedSiteProfile {
 
   // Whether to use the JavaScript Fullscreen API.
   useRequestFullscreen: boolean;
+  // If true, skip the simple retry ladder and go directly to aggressive fullscreen on the first attempt.
+  aggressiveFullscreenFirst: boolean;
+  // Override the delay (ms) between fullscreen verification attempts. Default is 500ms.
+  fullscreenRetryDelay: number;
+  // Override the delay (ms) to wait after applying styles/triggering fullscreen before verifying. Default is 200ms.
+  fullscreenVerifyDelay: number;
 
   // Per-domain video timeout in milliseconds, or null to use the global CONFIG.streaming.videoTimeout.
   videoTimeout: Nullable<number>;

@@ -39,7 +39,14 @@ type AggressiveCallback = (type: string) => void;
  */
 function makeProfile(overrides: Partial<ResolvedSiteProfile> = {}): ResolvedSiteProfile {
 
-  return { useRequestFullscreen: true, ...overrides } as unknown as ResolvedSiteProfile;
+  return {
+
+    aggressiveFullscreenFirst: false,
+    fullscreenRetryDelay: 500,
+    fullscreenVerifyDelay: 200,
+    useRequestFullscreen: true,
+    ...overrides
+  } as unknown as ResolvedSiteProfile;
 }
 
 /**

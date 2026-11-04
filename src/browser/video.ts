@@ -1242,16 +1242,20 @@ async function runFullscreenSequence(
 ): Promise<void> {
 
   // Configuration for retry behavior. These values are tuned for typical page load timing.
+  // Profile-specific overrides take precedence over these defaults.
   const maxSimpleRetries = 3;
-  const retryDelay = 500;
-  const verifyDelay = 200;
+  const retryDelay = profile.fullscreenRetryDelay;
+  const verifyDelay = profile.fullscreenVerifyDelay;
+  const skipRetries = profile.aggressiveFullscreenFirst;
 
-  for(let attempt = 1; attempt <= maxSimpleRetries; attempt++) {
+  const attemptLimit = skipRetries ? 1 : maxSimpleRetries;
+
+  for(let attempt = 1; attempt <= attemptLimit; attempt++) {
 
     // On retry when the native Fullscreen API is in use, click the video to provide fresh user activation. The Fullscreen API requires a recent user gesture (transient
     // activation) to succeed - without it, requestFullscreen() is silently rejected. The initial attempt relies on activation from page navigation, but retries
     // need an explicit click.
-    if((attempt > 1) && useNativeFullscreen) {
+    if((attempt > 1) && useNativeFullscreen && !skipRetries) {
 
       // eslint-disable-next-line no-await-in-loop
       await clickVideoForActivation(page, context, selectorType, clock);
@@ -1284,9 +1288,9 @@ async function runFullscreenSequence(
 
         if(!nativeActive) {
 
-          if(attempt < maxSimpleRetries) {
+          if(attempt < attemptLimit) {
 
-            LOG.debug("browser:video", "Native fullscreen not active (attempt %s/%s). Retrying with user activation.", attempt, maxSimpleRetries);
+            LOG.debug("browser:video", "Native fullscreen not active (attempt %s/%s). Retrying with user activation.", attempt, attemptLimit);
 
             // eslint-disable-next-line no-await-in-loop
             await clock.delay(retryDelay);

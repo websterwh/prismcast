@@ -16,9 +16,9 @@ import { TestClock, settle } from "homebridge-plugin-utils/testing";
 import { awaitMatchingManifest, installManifestInterceptor } from "./manifestInterceptor.ts";
 import { beforeEach, describe, test } from "node:test";
 import type { Clock } from "homebridge-plugin-utils";
+import type { ManifestInterceptorHandle } from "./manifestInterceptor.ts";
 import type { Nullable } from "../types/index.ts";
 import type { Page } from "puppeteer-core";
-import type { ManifestInterceptorHandle } from "./manifestInterceptor.ts";
 import assert from "node:assert/strict";
 import { closePuppeteerStreamWssOnIdle } from "../testing.helpers.ts";
 

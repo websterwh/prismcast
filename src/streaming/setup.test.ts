@@ -346,7 +346,7 @@ describe("verifyManifestSelection", () => {
     /* Traced path: the fixture URL decodes to a different call sign than the selector, so the live Fox verifier would return a mismatch reason if the kind gate
      * let it through. A regression that inverted the kind comparison therefore fails this row with a reason instead of null.
      */
-    const interception: ManifestInterceptionResult = { manifestUrl: FOX_MEDIA_URL, selectedKind: "media", isEncrypted: false };
+    const interception: ManifestInterceptionResult = { isEncrypted: false, manifestUrl: FOX_MEDIA_URL, selectedKind: "media" };
     const result = await verifyManifestSelection(Promise.resolve(interception),
       makeProfile({ channelSelection: { strategy: "foxGrid" }, channelSelector: "FNC" }));
 
@@ -356,7 +356,7 @@ describe("verifyManifestSelection", () => {
   test("resolves null without consulting the interception when the provider has no verifier", async () => {
 
     // Traced path: guideGrid is a registered provider that implements no verifier, so the gate is the missing hook rather than a missing provider.
-    const watched = makeWatchedInterception({ manifestUrl: FOX_MASTER_URL, selectedKind: "master", isEncrypted: false });
+    const watched = makeWatchedInterception({ isEncrypted: false, manifestUrl: FOX_MASTER_URL, selectedKind: "master" });
     const result = await verifyManifestSelection(watched.promise, makeProfile({ channelSelection: { strategy: "guideGrid" }, channelSelector: "FNC" }));
 
     assert.equal(result, null);
@@ -366,7 +366,7 @@ describe("verifyManifestSelection", () => {
   test("resolves null without consulting the interception when the profile carries no channel selector", async () => {
 
     // Traced path: the verifier exists but has no expected channel to compare against, so there is nothing to verify and nothing to wait for.
-    const watched = makeWatchedInterception({ manifestUrl: FOX_MASTER_URL, selectedKind: "master", isEncrypted: false });
+    const watched = makeWatchedInterception({ isEncrypted: false, manifestUrl: FOX_MASTER_URL, selectedKind: "master" });
     const result = await verifyManifestSelection(watched.promise, makeProfile({ channelSelection: { strategy: "foxGrid" }, channelSelector: null }));
 
     assert.equal(result, null);
@@ -376,7 +376,7 @@ describe("verifyManifestSelection", () => {
   test("resolves null when the live Fox verifier accepts a master URL for the requested call sign", async () => {
 
     // Traced path: the full pass-through - gates admit, kind admits, and the provider's own verifier decodes "fnc" from the URL and matches the selector.
-    const interception: ManifestInterceptionResult = { manifestUrl: FOX_MASTER_URL, selectedKind: "master", isEncrypted: false };
+    const interception: ManifestInterceptionResult = { isEncrypted: false, manifestUrl: FOX_MASTER_URL, selectedKind: "master" };
     const result = await verifyManifestSelection(Promise.resolve(interception),
       makeProfile({ channelSelection: { strategy: "foxGrid" }, channelSelector: "FNC" }));
 
@@ -388,7 +388,7 @@ describe("verifyManifestSelection", () => {
     /* Traced path: the same URL against a different selector. The reason string is the provider's, returned through the helper unchanged, which is what makes
      * this the pass-through half of the pair rather than a second acceptance row.
      */
-    const interception: ManifestInterceptionResult = { manifestUrl: FOX_MASTER_URL, selectedKind: "master", isEncrypted: false };
+    const interception: ManifestInterceptionResult = { isEncrypted: false, manifestUrl: FOX_MASTER_URL, selectedKind: "master" };
     const result = await verifyManifestSelection(Promise.resolve(interception),
       makeProfile({ channelSelection: { strategy: "foxGrid" }, channelSelector: "FS1" }));
 

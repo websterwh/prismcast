@@ -1357,6 +1357,7 @@ interface NativeProxyOptions {
   // The URL the tune was asked for, as completeStreamSetup received it, which the native proxy and the manifest re-establishment use.
   readonly url: string;
 }
+
 export async function startNativeProxy(options: NativeProxyOptions): Promise<Nullable<NativeStreamingResult>> {
 
   const { entry, mpegTsClient, setup, url } = options;
@@ -1385,15 +1386,18 @@ export async function startNativeProxy(options: NativeProxyOptions): Promise<Nul
 
   // If we have a direct HLS manifest, create a resolved promise with that URL.
   // This bypasses the manifest interception flow.
+  const directHlsManifest = setup.directHlsManifest;
   const interceptionPromise = setup.manifestInterception?.promise ??
-    Promise.resolve({ manifestUrl: setup.directHlsManifest!, selectedKind: "master", isEncrypted: false });
+    Promise.resolve({ isEncrypted: false, manifestUrl: directHlsManifest ?? "", selectedKind: "master" });
 
   const nativeResult = await attemptNativeStreaming({
+
     channelName,
     emeInterceptor: setup.emeInterceptor,
     interceptionPromise,
     mpegTsClient,
     onError: (error) => {
+
       if(isTerminationInitiated(numericStreamId)) {
 
         return;

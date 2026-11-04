@@ -1532,7 +1532,7 @@ describe("refreshNativeManifest", () => {
     const clock = new TestClock(BASE_TIME_MS);
     const hooks: ProxyStubHooks = { audioVariantUrl: "", isStopped: false, lastRefreshDelayMs: null, pipelineShape: MUXED_TS_PIPELINE,
       setTokenRefreshTimerCalls: 0, variantUrl: "" };
-    const capability = makeReestablishStub({ manifestUrl: masterUrl, selectedKind: "master", isEncrypted: false });
+    const capability = makeReestablishStub({ isEncrypted: false, manifestUrl: masterUrl, selectedKind: "master" });
 
     clearProbeCache("reestablish-channel");
 
@@ -1598,7 +1598,7 @@ describe("refreshNativeManifest", () => {
     const clock = new TestClock(BASE_TIME_MS);
     const hooks: ProxyStubHooks = { audioVariantUrl: "", isStopped: false, lastRefreshDelayMs: null, pipelineShape: MUXED_TS_PIPELINE,
       setTokenRefreshTimerCalls: 0, variantUrl: "" };
-    const capability = makeReestablishStub({ manifestUrl: "https://cdn.test/never-read.m3u8", selectedKind: "master", isEncrypted: false });
+    const capability = makeReestablishStub({ isEncrypted: false, manifestUrl: "https://cdn.test/never-read.m3u8", selectedKind: "master" });
 
     const result = await refreshNativeManifest({
 

@@ -317,7 +317,7 @@ describe("adjudicateChannelSelection", () => {
      * It deliberately claims nothing about the awaiting path; the verifier-bearing row below covers that.
      */
     const steps: string[] = [];
-    const handle = makeHandle(steps, { manifestUrl: FOX_MASTER_URL, selectedKind: "master", isEncrypted: false });
+    const handle = makeHandle(steps, { isEncrypted: false, manifestUrl: FOX_MASTER_URL, selectedKind: "master" });
     const result = await adjudicateChannelSelection(handle, makeProfile({ channelSelection: { strategy: "guideGrid" }, channelSelector: "FNC" }), true);
 
     assert.equal(result, null, "a stream with nothing to verify raises no objection");
@@ -329,7 +329,7 @@ describe("adjudicateChannelSelection", () => {
     // Traced path: the genuinely-awaiting half. A Fox-strategy profile with a selector admits the verifier, the master-kind interception admits the URL check,
     // and the provider decodes "fnc" from the URL to match the selector. The step order is the claim: the read of the promise lands after the finalize fired.
     const steps: string[] = [];
-    const handle = makeHandle(steps, { manifestUrl: FOX_MASTER_URL, selectedKind: "master", isEncrypted: false });
+    const handle = makeHandle(steps, { isEncrypted: false, manifestUrl: FOX_MASTER_URL, selectedKind: "master" });
     const result = await adjudicateChannelSelection(handle, makeProfile({ channelSelection: { strategy: "foxGrid" }, channelSelector: "FNC" }), false);
 
     assert.equal(result, null, "the verifier accepts a master URL for the requested call sign");
@@ -341,7 +341,7 @@ describe("adjudicateChannelSelection", () => {
     // Traced path: the same fixture against a different selector, so the reason string is the provider's own, returned through both stages unchanged. This is
     // what makes the pair a pass-through proof rather than a second acceptance row.
     const steps: string[] = [];
-    const handle = makeHandle(steps, { manifestUrl: FOX_MASTER_URL, selectedKind: "master", isEncrypted: false });
+    const handle = makeHandle(steps, { isEncrypted: false, manifestUrl: FOX_MASTER_URL, selectedKind: "master" });
     const result = await adjudicateChannelSelection(handle, makeProfile({ channelSelection: { strategy: "foxGrid" }, channelSelector: "FS1" }), false);
 
     assert.equal(result, "Manifest URL is for channel \"fnc\", but \"FS1\" was requested.", "the verifier's reason reaches the caller unchanged");

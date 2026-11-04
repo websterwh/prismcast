@@ -430,7 +430,7 @@ export async function installManifestInterceptor(page: Page, timeout: number,
       LOG.debug("native:intercept", "Interception %s in %sms with %s capture(s). Using %s %s: %s.", reason, elapsed(), manifestCount,
         directTune ? "first" : "latest", selection.kind, selection.url.slice(0, 120));
       observer.dispose();
-      resolve({ manifestUrl: selection.url, selectedKind: selection.kind, isEncrypted: false });
+      resolve({ isEncrypted: false, manifestUrl: selection.url, selectedKind: selection.kind });
     } else {
 
       LOG.debug("native:intercept", "Interception %s in %sms but no HLS playlist was captured.", reason, elapsed());

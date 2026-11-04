@@ -4,11 +4,11 @@
  */
 import type { Express, Request, Response } from "express";
 import { HDHR_FIRMWARE_NAME, HDHR_MANUFACTURER, HDHR_MODEL_NUMBER } from "./identity.ts";
+import { buildChannelMap, getChannelKeyByNumber } from "./channelMap.ts";
 import { escapeXml, getPackageVersion } from "../utils/index.ts";
 import { CONFIG } from "../config/index.ts";
-import { buildChannelMap, getChannelKeyByNumber } from "./channelMap.ts";
-import { handleMpegTsStream } from "../streaming/mpegts.ts";
 import { getTunerStates } from "./tunerState.ts";
+import { handleMpegTsStream } from "../streaming/mpegts.ts";
 
 /* These endpoints implement the HDHomeRun HTTP API that Plex uses to identify, configure, and monitor tuners. Plex auto-detects PrismCast on the LAN through
  * the UDP responder in udp.ts (when CONFIG.hdhr.discoveryEnabled is on) or accepts a manual IP:port via its DVR setup screen. Channels DVR and other HDHR-

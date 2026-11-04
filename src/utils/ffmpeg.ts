@@ -75,14 +75,16 @@ async function probeSystemFFmpeg(ctx: FFmpegContext): Promise<string | undefined
 }
 
 // Common input-side flags shared by every FFmpeg spawner. They silence the banner and per-frame stats, restrict logging to warnings and errors, tolerate corrupt
-// input frames rather than aborting on read errors, and cap input probing at 16KB so the encoder begins emitting output as soon as the first segment lands.
+// input frames rather than aborting on read errors, and cap input probing at 8KB so the encoder begins emitting output as soon as the first segment lands.
+// Reduced from 16KB to 8KB for faster startup - the first fMP4 segment contains complete codec configuration.
 const FFMPEG_INPUT_FLAGS: readonly string[] = [
   "-hide_banner",
   "-nostats",
   "-loglevel", "warning",
   "-fflags", "+discardcorrupt",
   "-err_detect", "ignore_err",
-  "-probesize", "16384"
+  "-probesize", "8192",
+  "-analyzeduration", "500000"
 ];
 
 /**
@@ -235,9 +237,11 @@ const MPEGTS_OUTPUT_FLAGS = [
   "-mpegts_pmt_start_pid", "0x0020",
   "-mpegts_start_pid", "0x0031",
   "-mpegts_service_type", "digital_tv",
-  "-pat_period", "0.1",
-  "-pcr_period", "40",
-  "-flush_packets", "1"
+  "-pat_period", "0.05",     // Reduced from 0.1s to 0.05s for faster PAT/PMT emission
+  "-pcr_period", "20",       // Reduced from 40ms to 20ms for more frequent PCR
+  "-flush_packets", "1",
+  "-muxdelay", "0",          // No muxing delay - output packets immediately
+  "-muxpreload", "0"         // No preload - start output immediately
 ];
 
 // FFmpeg Exit Classification.

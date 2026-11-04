@@ -353,9 +353,12 @@ describe("establishmentBudgetMs", () => {
 
   test("adds the playback bound, the finalize settle, and the margin to the caller's navigation allowance", () => {
 
-    // A conscious assertion of the budget rule: 45000 for the playback bound, 1500 for the settle the interceptor waits out, and 5000 of margin. A term that changed
-    // without this row changing with it would silently shrink or stretch every establishment's observation window.
-    assert.equal(establishmentBudgetMs(10000), 61500);
-    assert.equal(establishmentBudgetMs(0), 51500, "the fixed terms are the floor for a caller with no navigation allowance");
+    // A conscious assertion of the budget rule: 30000 for the playback bound
+    // (reduced from 45000), 800 for the settle the interceptor waits out
+    // (reduced from 1500), and 5000 of margin. A term that changed
+    // without this row changing with it would silently shrink or stretch
+    // every establishment's observation window.
+    assert.equal(establishmentBudgetMs(10000), 45800);
+    assert.equal(establishmentBudgetMs(0), 35800, "the fixed terms are the floor for a caller with no navigation allowance");
   });
 });

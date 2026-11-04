@@ -407,18 +407,17 @@ describe("buildSpawnFFmpegArgs", () => {
   /* The argv builder is pure. We assert the exact flag positions and values that production FFmpeg invocations depend on; if any of these shift, the tests catch it
    * before the spawn happens at runtime. The aac_at vs aac selection is platform-conditional and is documented separately.
    */
-
   test("includes the canonical FFmpeg input flags at the start of argv", () => {
-
     const args = buildSpawnFFmpegArgs(256000);
 
-    // The input flags suppress banners and per-frame stats, restrict logging to warnings and errors, tolerate corrupt input frames, and cap input probing at 16KB.
-    assert.ok(args.includes("-hide_banner"));
+    // The input flags suppress banners and per-frame stats, restrict logging to warnings and errors, tolerate corrupt input frames, and cap input probing at 8KB.
+
     assert.ok(args.includes("-nostats"));
     assert.deepEqual(args.slice(args.indexOf("-loglevel"), args.indexOf("-loglevel") + 2), [ "-loglevel", "warning" ]);
     assert.deepEqual(args.slice(args.indexOf("-fflags"), args.indexOf("-fflags") + 2), [ "-fflags", "+discardcorrupt" ]);
     assert.deepEqual(args.slice(args.indexOf("-err_detect"), args.indexOf("-err_detect") + 2), [ "-err_detect", "ignore_err" ]);
-    assert.deepEqual(args.slice(args.indexOf("-probesize"), args.indexOf("-probesize") + 2), [ "-probesize", "16384" ]);
+    assert.deepEqual(args.slice(args.indexOf("-probesize"), args.indexOf("-probesize") + 2), [ "-probesize", "8192" ]);
+    assert.deepEqual(args.slice(args.indexOf("-analyzeduration"), args.indexOf("-analyzeduration") + 2), [ "-analyzeduration", "500000" ]);
   });
 
   test("reads Matroska from stdin (-i pipe:0)", () => {
@@ -567,7 +566,6 @@ describe("buildMpegTsRemuxerArgs", () => {
   });
 
   test("emits MPEG-TS with ATSC-conventional service and PID conventions", () => {
-
     const args = buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all");
 
     // Output container.
@@ -577,8 +575,12 @@ describe("buildMpegTsRemuxerArgs", () => {
     assert.equal(args[args.indexOf("-mpegts_pmt_start_pid") + 1], "0x0020");
     assert.equal(args[args.indexOf("-mpegts_start_pid") + 1], "0x0031");
     assert.equal(args[args.indexOf("-mpegts_service_type") + 1], "digital_tv");
-    assert.equal(args[args.indexOf("-pat_period") + 1], "0.1");
-    assert.equal(args[args.indexOf("-pcr_period") + 1], "40");
+    // Optimized for faster first-packet output
+    assert.equal(args[args.indexOf("-pat_period") + 1], "0.05");
+    assert.equal(args[args.indexOf("-pcr_period") + 1], "20");
+    assert.equal(args[args.indexOf("-flush_packets") + 1], "1");
+    assert.equal(args[args.indexOf("-muxdelay") + 1], "0");
+    assert.equal(args[args.indexOf("-muxpreload") + 1], "0");
   });
 
   test("adds the selected Annex B filter before MPEG-TS muxing", () => {

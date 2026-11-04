@@ -38,8 +38,8 @@ import { observeHlsPlaylists } from "./hlsPlaylistObserver.ts";
 // switch may trigger a manifest fetch that arrives milliseconds after the click handler returns, and for direct tunes that have not yet captured a master
 // manifest. A direct tune skips this delay and resolves immediately only once a master manifest has already arrived. Exported so a caller sizing its own
 // interception window (streaming/setup.ts) can include the settle window the window must outlive.
-export const FINALIZE_SETTLE_DELAY = 1500;
-
+// Reduced from 1500ms to 800ms - YouTube TV direct tunes don't need this, and guide-based tunes typically complete manifest fetch faster.
+export const FINALIZE_SETTLE_DELAY = 800;
 // Default timeout for awaitMatchingManifest. Tune verification is a short-lived check after a click, so the budget is tighter than the native interception path.
 const VERIFICATION_TIMEOUT = 8000;
 

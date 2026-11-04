@@ -104,9 +104,9 @@ const PROBE_TEARDOWN_ALLOWANCE_MS = STOP_RECORDING_CEILING_MS + PAGE_CLOSE_MARGI
 
 // The playback-initialization safety-net timeout. Channel selection plus video setup runs after navigation with no outer timeout racing its internal click
 // retries; for guideGrid strategies a selection failure triggers an overlay dismiss and retry, which doubles the channel-selection budget. 45 seconds accommodates
-// that retry while still preventing a pathological hang if multiple internal timeouts chain sequentially. Consumed by both the phase-2 race and the interception
-// budget below.
-const PLAYBACK_INIT_TIMEOUT = 45000;
+// That retry while still preventing a pathological hang if multiple internal timeouts chain sequentially. Consumed by both the phase-2 race and the interception
+// budget below. Reduced from 45000ms to 30000ms - this is a safety ceiling, not a healthy path latency. Most tunes complete in 10-20s.
+const PLAYBACK_INIT_TIMEOUT = 30000;
 
 // Margin folded into the interception budget beyond the phases it explicitly sizes: the small span between phase-2 finishing and finalize firing (the
 // capture-surface re-affirmation and the window-visibility sync, setupStream's pre-verification work) plus true slack. The interception window is a leak bound for

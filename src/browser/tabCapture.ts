@@ -62,16 +62,19 @@ export const EXTENSION_NOT_READY_MESSAGE = "The capture extension is not ready o
 // keyboard command costs one attempt and no wait at all; the ceiling bounds the case where it never lands, so the caller sees Chrome's own message rather than
 // a hang. One attempt is a handful of CDP round trips - the selection re-assert, the five key events, the start - taken inside a selection held across the whole
 // poll, so the ceiling is sized to afford several of them rather than to a multiple of the cadence alone.
+// Reduced from 1000ms to 500ms ceiling - activeTab grant typically lands within 100-200ms.
 export const ACTIVE_TAB_GRANT_POLL_MS = 50;
-export const ACTIVE_TAB_GRANT_CEILING_MS = 1000;
+export const ACTIVE_TAB_GRANT_CEILING_MS = 500;
 
 // The recorder's timeslice in milliseconds - how often the extension's MediaRecorder hands a chunk to its socket. A browser-side recorder setting rather than a
 // wait of ours, at the value the capture pipeline was tuned against.
-export const CAPTURE_FRAME_SIZE_MS = 20;
+// Reduced from 20ms to 10ms for faster segment delivery to downstream.
+export const CAPTURE_FRAME_SIZE_MS = 10;
 
 // The capture stream's buffer ceiling. Chrome delivers bursty multi-megabyte chunks on keyframes, so the buffer is sized to absorb a burst without the socket's
 // writes backing up into the recorder.
-export const CAPTURE_STREAM_HIGH_WATER_MARK = 8 * 1024 * 1024;
+// Reduced from 8MB to 4MB - lowers memory pressure and reduces buffering latency.
+export const CAPTURE_STREAM_HIGH_WATER_MARK = 4 * 1024 * 1024;
 
 // Types.
 

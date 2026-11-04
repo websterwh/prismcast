@@ -21,18 +21,21 @@ import { declareKeysOf } from "../testing.helpers.ts";
  * needed there because TypeScript's required-field check at the factory's return type covers required-field drift.
  */
 export const RESOLVED_SITE_PROFILE_KEYS = declareKeysOf<ResolvedSiteProfile>()([
-
+  "aggressiveFullscreenFirst",
   "channelSelection",
   "channelSelector",
   "clickSelector",
   "clickToPlay",
   "dismissSelector",
   "fullscreenKey",
+  "fullscreenRetryDelay",
   "fullscreenSelector",
+  "fullscreenVerifyDelay",
   "hideSelector",
   "lockVolumeProperties",
   "maxContinuousPlayback",
   "needsIframeHandling",
+  "segmentDuration",
   "selectReadyVideo",
   "staticCapture",
   "useRequestFullscreen",
@@ -49,20 +52,22 @@ export const RESOLVED_SITE_PROFILE_KEYS = declareKeysOf<ResolvedSiteProfile>()([
  * @returns A ResolvedSiteProfile suitable for tests.
  */
 export function makeProfile(overrides: Partial<ResolvedSiteProfile> = {}): ResolvedSiteProfile {
-
   return {
-
+    aggressiveFullscreenFirst: false,
     channelSelection: { strategy: "none" },
     channelSelector: null,
     clickSelector: null,
     clickToPlay: false,
     dismissSelector: null,
     fullscreenKey: null,
+    fullscreenRetryDelay: 500,
     fullscreenSelector: null,
+    fullscreenVerifyDelay: 200,
     hideSelector: null,
     lockVolumeProperties: false,
     maxContinuousPlayback: null,
     needsIframeHandling: false,
+    segmentDuration: null,
     selectReadyVideo: false,
     staticCapture: false,
     useRequestFullscreen: false,

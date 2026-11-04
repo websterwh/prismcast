@@ -39,6 +39,7 @@ import { snapshotStreamSettings } from "../config/streamSettings.ts";
 import { suppressPageAudio } from "../browser/video.ts";
 import { systemClock } from "homebridge-plugin-utils";
 import { triggerShowNameUpdate } from "./showInfo.ts";
+import { getProfileForChannel } from "../config/profiles.ts";
 
 /* This module handles HLS (HTTP Live Streaming) output using fMP4 (fragmented MP4) segments. HLS mode captures Matroska (the effective capture codec plus Opus)
  * from puppeteer-stream, which an FFmpeg child remuxes to fMP4 (transcoding the audio to AAC) before the fMP4 segmenter cuts it. The stream initialization flow
@@ -1242,21 +1243,28 @@ interface CreatePendingEntryOptions {
  * @returns The registered entry, the one carrier of the stream's ids, settings, and start instant down to its setup.
  */
 function createPendingEntry(options: CreatePendingEntryOptions): StreamRegistryEntry {
-
   const { channel, channelName, hls, numericStreamId, streamIdStr, url } = options;
 
   // The registration instant, read once so the one instant stamps both the access time and the entry's start.
   const now = systemClock.now();
+  const settings = snapshotStreamSettings(CONFIG);
+
+  // Apply profile segmentDuration override if available. This must happen at registration so the segmenter
+  // receives the correct value. The profile is resolved from the channel or URL.
+    if(channel) {
+      const profile = getProfileForChannel(channel).profile;
+      if(profile.segmentDuration !== null && profile.segmentDuration !== undefined) {
+        Object.assign(settings, { segmentDuration: profile.segmentDuration });
+      }
+    }
 
   const entry: StreamRegistryEntry = {
-
     channelName: channel?.name ?? null,
     clientAddress: options.clientAddress ?? null,
     hls,
     id: numericStreamId,
     identity: makePendingCaptureIdentity(),
     info: {
-
       lastPlaylistRequest: now,
       storeKey: channelName
     },
@@ -1266,7 +1274,7 @@ function createPendingEntry(options: CreatePendingEntryOptions): StreamRegistryE
     preTuned: options.preTuned ?? false,
     probeIdentity: null,
     profile: null,
-    settings: snapshotStreamSettings(CONFIG),
+    settings,
     startTime: now,
     streamIdStr,
     url

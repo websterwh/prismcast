@@ -111,19 +111,17 @@ export function resolveProfile(profileName: string | undefined): ResolvedSitePro
  * @returns A new profile with domain-level properties applied.
  */
 function mergeDomainProperties(profile: ResolvedSiteProfile, config: DomainConfig | undefined): ResolvedSiteProfile {
-
   if(!config) {
-
     return profile;
   }
 
   return {
-
     ...profile,
     ...(config.dismissSelector !== undefined ? { dismissSelector: config.dismissSelector } : {}),
     ...(config.hideSelector !== undefined ? { hideSelector: config.hideSelector } : {}),
     ...(config.maxContinuousPlayback !== undefined ? { maxContinuousPlayback: config.maxContinuousPlayback } : {}),
-    ...(config.videoTimeout !== undefined ? { videoTimeout: config.videoTimeout } : {})
+    ...(config.videoTimeout !== undefined ? { videoTimeout: config.videoTimeout } : {}),
+    ...(config.segmentDuration !== undefined ? { segmentDuration: config.segmentDuration } : {})
   };
 }
 

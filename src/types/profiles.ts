@@ -243,6 +243,9 @@ export interface SiteProfile {
   // Whether to wait for network idle during page navigation. When true, page.goto() waits for the network to be idle (no requests for 500ms) before returning.
   // This ensures all JavaScript has finished loading and executing. Disable for sites that have persistent connections or polling that prevents network idle.
   waitForNetworkIdle?: boolean;
+  // Per-site HLS segment duration override in seconds. When set, overrides the global hls.segmentDuration setting for streams using this profile.
+  // Shorter segments reduce end-to-end latency but increase playlist/segment overhead. Typical range: 1-4 seconds.
+  segmentDuration?: number;
 }
 
 /**
@@ -303,7 +306,8 @@ export interface ResolvedSiteProfile {
 
   // Per-domain video timeout in milliseconds, or null to use the global CONFIG.streaming.videoTimeout.
   videoTimeout: Nullable<number>;
-
+  // Per-site HLS segment duration override in seconds, or null to use the global CONFIG.hls.segmentDuration.
+  segmentDuration: Nullable<number>;
   // Whether to wait for network idle during navigation.
   waitForNetworkIdle: boolean;
 }
@@ -358,12 +362,12 @@ export interface DomainConfig {
   // Maximum continuous playback duration in hours before the site enforces a stream cutoff. When set, the playback monitor proactively reloads the page before this
   // limit expires to maintain uninterrupted streaming. Fractional values are supported (e.g., 1.5 for 90 minutes). Omit for sites that allow indefinite playback.
   maxContinuousPlayback?: number;
-
+  // Per-site HLS segment duration override in seconds. When set, overrides the global hls.segmentDuration setting for streams on this domain.
+  // Shorter segments reduce end-to-end latency but increase playlist/segment overhead. Typical range: 1-4 seconds.
+  segmentDuration?: number;
   // Site profile name for automatic profile detection. When a URL matches this domain, the specified profile is used to configure site-specific behavior
   // (fullscreen method, iframe handling, etc.). Omit for domains that only need a display name.
   profile?: string;
-
-  // Friendly service name shown in the UI source column, service dropdowns, and labels. When set, this name is used instead of the raw domain string (e.g.,
   // "Hulu" instead of "hulu.com"). Omit to fall back to the concise domain extracted from the URL.
   service?: string;
 

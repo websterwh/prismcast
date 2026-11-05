@@ -187,9 +187,8 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
    */
 
   test("no-op save: submitting unchanged form values does not write a stored override and reports 'No changes to save.'", async () => {
-
     // Submission matches the resolved display channel exactly. The handler short-circuits via channelMatches and returns the no-op message without writing.
-    const formBody = makeFormBody({ name: "ABC", tags: "Local", url: "https://abc.com/watch-live" });
+    const formBody = makeFormBody({ channelNumber: "7", name: "ABC", tags: "Local", url: "https://abc.com/watch-live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -245,7 +244,7 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
 
     // Submit a save that customizes both an identity field (name -> "ABC Custom") and a binding field (channelSelector -> "ABC-CUSTOM"). The handler must split
     // these between abc (canonical) and abc-hulu (variant).
-    const formBody = makeFormBody({ channelSelector: "ABC-CUSTOM", name: "ABC Custom", tags: "Local", url: "https://www.hulu.com/live" });
+    const formBody = makeFormBody({ channelNumber: "7", channelSelector: "ABC-CUSTOM", name: "ABC Custom", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -302,17 +301,15 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
   });
 
   test("revert path: submission matching predefined exactly clears any stored override and announces revert", async () => {
-
     // Pre-seed a canonical override so the test exercises the revert branch (hasCanonicalEntry = true).
     const { mutateChannels } = await import("../../../../config/userChannels.ts");
 
     await mutateChannels((data) => {
-
       data.channels["abc"] = { name: "ABC Override" };
     });
 
     // Submit values matching the predefined exactly. handlePredefinedEdit's canonicalHasChanges is false, so it routes to the revert branch.
-    const formBody = makeFormBody({ name: "ABC", tags: "Local", url: "https://abc.com/watch-live" });
+    const formBody = makeFormBody({ channelNumber: "7", name: "ABC", tags: "Local", url: "https://abc.com/watch-live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -397,7 +394,7 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
      * matching the abc-hulu sibling and is NOT stored on the canonical (binding matches predefined exactly so no variant override is created either),
      * serviceSelections.abc = "abc-hulu".
      */
-    const formBody = makeFormBody({ name: "ABC", stationId: "20456", tags: "Local", url: "https://www.hulu.com/live" });
+    const formBody = makeFormBody({ channelSelector: "ABC", name: "ABC", stationId: "20456", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -425,9 +422,9 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
   });
 
   test("PUT with submitted URL matching a sibling AND a divergent binding field persists the divergence as a variant binding-only override", async () => {
-
     /* Same as above but the user also customizes channelSelector. The matching sibling abc-hulu has predefined channelSelector "ABC"; the user submits
      * "MyCustomABC". The handler routes the divergent binding to the variant entry, leaving the canonical with identity-only fields.
+     * Since channelNumber is now predefined (7), it matches and is cleared to null in the delta.
      */
     const formBody = makeFormBody({ channelSelector: "MyCustomABC", name: "ABC", stationId: "20456", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
@@ -442,7 +439,7 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
     const abcEntry = stored["abc"];
     const variantEntry = stored["abc-hulu"];
 
-    assert.deepEqual(abcEntry, { stationId: "20456" }, "canonical retains identity-only delta");
+    assert.deepEqual(abcEntry, { stationId: "20456", channelNumber: null }, "canonical retains identity-only delta (channelNumber cleared to match predefined)");
     assert.ok(variantEntry, "variant entry must exist when binding diverges from predefined");
     assert.equal(variantEntry["channelSelector"], "MyCustomABC", "divergent channelSelector persisted as variant binding override");
     assert.equal(variantEntry["url"], undefined, "URL not stored on variant - it matches the predefined Hulu URL");
@@ -495,7 +492,7 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
       data.serviceSelections["abc"] = "abc-cox";
     });
 
-    const formBody = makeFormBody({ channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
+    const formBody = makeFormBody({ channelNumber: "7", channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -528,7 +525,7 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
       data.serviceSelections["abc"] = "abc-cox";
     });
 
-    const formBody = makeFormBody({ channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
+    const formBody = makeFormBody({ channelNumber: "7", channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -562,7 +559,7 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
 
     try {
 
-      const formBody = makeFormBody({ channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
+      const formBody = makeFormBody({ channelNumber: "7", channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
       const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
       await put(req, res, () => undefined);
@@ -601,7 +598,7 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
       data.serviceSelections["abc"] = "abc-hulu";
     });
 
-    const formBody = makeFormBody({ channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
+    const formBody = makeFormBody({ channelNumber: "7", channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -628,12 +625,11 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
     const { mutateChannels } = await import("../../../../config/userChannels.ts");
 
     await mutateChannels((data) => {
-
       data.channels["abc-hulu"] = { canonicalKey: "abc", channelSelector: "MyCustomABC" };
       data.serviceSelections["abc"] = "abc-hulu";
     });
 
-    const formBody = makeFormBody({ channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
+    const formBody = makeFormBody({ channelNumber: "7", channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -654,11 +650,10 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
     const { mutateChannels } = await import("../../../../config/userChannels.ts");
 
     await mutateChannels((data) => {
-
       data.channels["abc"] = { name: "ABC Override" };
     });
 
-    const formBody = makeFormBody({ channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
+    const formBody = makeFormBody({ channelNumber: "7", channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -678,7 +673,6 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
   });
 
   test("full-value sibling match picks the exact variant when a same-domain sibling exists", async () => {
-
     /* A user-stored sibling sits on the same domain as the Hulu variant and sorts ahead of it alphabetically, so URL-domain inference would pick that one.
      * Full-value matching compares every submitted field against each sibling's predefined data, so it lands on abc-hulu - the sibling whose values the user
      * actually submitted - and leaves the same-domain entry untouched.
@@ -687,11 +681,10 @@ describe("handlePredefinedEdit (PUT /config/channels/:key)", () => {
     const alphaEntry = { canonicalKey: "abc", url: "https://www.hulu.com/live/alpha" };
 
     await mutateChannels((data) => {
-
       data.channels["abc-alpha"] = { ...alphaEntry };
     });
 
-    const formBody = makeFormBody({ channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
+    const formBody = makeFormBody({ channelNumber: "7", channelSelector: "ABC", name: "ABC", tags: "Local", url: "https://www.hulu.com/live" });
     const { json, req, res } = makeReqRes({ body: formBody, params: { key: "abc" } });
 
     await put(req, res, () => undefined);
@@ -945,8 +938,7 @@ describe("PATCH /config/channels/:key", () => {
   });
 
   test("accepts a valid channelNumber and persists it as a delta on the canonical entry", async () => {
-
-    const { json, req, res } = makeReqRes({ body: { channelNumber: 7 }, params: { key: "abc" } });
+    const { json, req, res } = makeReqRes({ body: { channelNumber: 150 }, params: { key: "abc" } });
 
     await patch(req, res, () => undefined);
 
@@ -958,6 +950,6 @@ describe("PATCH /config/channels/:key", () => {
     const abcEntry = (await readChannelsFile(dir))["abc"];
 
     assert.ok(abcEntry, "canonical entry must exist after patch");
-    assert.equal(abcEntry["channelNumber"], 7, "delta must persist the new channel number");
+    assert.equal(abcEntry["channelNumber"], 150, "delta must persist the new channel number");
   });
 });

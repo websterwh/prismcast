@@ -57,40 +57,49 @@ describe("buildChannelMap", () => {
   });
 
   test("uses numbers at or above AUTO_ASSIGN_START when no explicit assignments exist", () => {
-
-    // The current predefined catalog has no explicit channelNumber values, so every entry must come from the auto-assignment path. The first auto-assigned
-    // number is AUTO_ASSIGN_START (1000) and the rest follow sequentially.
+    // The predefined catalog now has some explicit channelNumber values (e.g., abc=7, cbs=4).
+    // Auto-assigned numbers should still be >= AUTO_ASSIGN_START (1000) and skip explicit numbers.
     const map = buildChannelMap();
 
     if(map.length === 0) {
-
       return;
     }
 
-    assert.ok(map.every((e) => e.number >= AUTO_ASSIGN_START), "every number is >= " + String(AUTO_ASSIGN_START));
+    // All numbers should be >= 1 (minimum valid), with auto-assigned ones >= AUTO_ASSIGN_START
+    const explicitNumbers = map.filter(e => e.number < AUTO_ASSIGN_START);
+    const autoNumbers = map.filter(e => e.number >= AUTO_ASSIGN_START);
+
+    // Verify auto-assigned numbers are all >= AUTO_ASSIGN_START
+    assert.ok(autoNumbers.every((e) => e.number >= AUTO_ASSIGN_START), "every auto-assigned number is >= " + String(AUTO_ASSIGN_START));
+    // Verify we have both explicit and auto-assigned
+    assert.ok(explicitNumbers.length > 0, "some channels have explicit numbers below " + String(AUTO_ASSIGN_START));
+    assert.ok(autoNumbers.length > 0, "some channels have auto-assigned numbers >= " + String(AUTO_ASSIGN_START));
   });
 
   test("auto-assigned numbers form a contiguous sequence starting at AUTO_ASSIGN_START", () => {
-
-    // No predefined channel currently sets an explicit number, so the entire output is contiguous: 1000, 1001, 1002, ... up to (1000 + count - 1). A future
-    // predefined-channel addition with explicit channelNumber would invalidate this assertion - that is the intent. The lock surfaces such additions for review.
+    // Auto-assigned numbers (those >= AUTO_ASSIGN_START) form a contiguous sequence.
+    // Explicit numbers below AUTO_ASSIGN_START are not part of this sequence.
     const map = buildChannelMap();
 
-    for(let i = 0; i < map.length; i++) {
+    const autoNumbers = map.filter(e => e.number >= AUTO_ASSIGN_START).map(e => e.number).toSorted((a, b) => a - b);
 
-      assert.equal(map[i]!.number, AUTO_ASSIGN_START + i, "entry " + String(i) + " has the expected sequential number");
+    // Verify contiguous sequence for auto-assigned numbers
+    for(let i = 0; i < autoNumbers.length; i++) {
+      assert.equal(autoNumbers[i], AUTO_ASSIGN_START + i, "auto-assigned entry " + String(i) + " has the expected sequential number");
     }
   });
 
   test("orders auto-assigned channels alphabetically by key", () => {
-
-    // The algorithm sorts unassigned entries by key.localeCompare before assigning numbers. Since every predefined channel currently lacks an explicit number,
-    // the resulting number-sorted output equals the key-sorted input. Locking this guards against accidental sort-key changes (e.g., switching to name).
+    // Auto-assigned channels (number >= AUTO_ASSIGN_START) are sorted alphabetically by key.
+    // Explicit-number channels may appear anywhere in the sequence.
     const map = buildChannelMap();
-    const keys = map.map((e) => e.key);
+
+    // Filter to auto-assigned channels only
+    const autoEntries = map.filter(e => e.number >= AUTO_ASSIGN_START);
+    const keys = autoEntries.map(e => e.key);
     const sortedKeys = keys.toSorted((a, b) => a.localeCompare(b));
 
-    assert.deepEqual(keys, sortedKeys, "keys appear in alphabetical order");
+    assert.deepEqual(keys, sortedKeys, "auto-assigned channels appear in alphabetical order by key");
   });
 
   test("includes every HDHR-enabled channel from getAllChannels", () => {

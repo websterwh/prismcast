@@ -41,6 +41,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   abc: {
     name: "ABC",
+    channelNumber: 7,
     tags: ["Local"],
     services: {
       cox: { channelSelector: "ABC", url: "https://watchtv.cox.com/listings" },
@@ -56,6 +57,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   abcnews: {
     name: "ABC News Live",
+    channelNumber: 8,
     tags: ["News"],
     stationId: "113380",
     services: {
@@ -70,6 +72,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   ae: {
     name: "A&E",
+    channelNumber: 118,
     tags: [ "Documentary", "Entertainment" ],
     pacificStationId: "57439",
     stationId: "51529",
@@ -87,6 +90,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   ahc: {
     name: "American Heroes",
+    channelNumber: 76,
     tags: ["Documentary"],
     stationId: "78808",
     services: {
@@ -99,6 +103,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   amc: {
     name: "AMC",
+    channelNumber: 131,
     tags: [ "Entertainment", "Movies" ],
     pacificStationId: "78836",
     stationId: "59337",
@@ -124,6 +129,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   animal: {
     name: "Animal Planet",
+    channelNumber: 70,
     tags: ["Documentary"],
     pacificStationId: "68785",
     stationId: "57394",
@@ -152,6 +158,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   bbcamerica: {
     name: "BBC America",
+    channelNumber: 28,
     tags: ["Entertainment"],
     pacificStationId: "76739",
     stationId: "64492",
@@ -167,6 +174,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   bbcnews: {
     name: "BBC News (North America)",
+    channelNumber: 27,
     tags: ["News"],
     stationId: "101449",
     services: {
@@ -181,6 +189,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   bet: {
     name: "BET",
+    channelNumber: 141,
     tags: ["Entertainment"],
     pacificStationId: "64673",
     stationId: "63236",
@@ -197,6 +206,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   bether: {
     name: "BET Her",
+    channelNumber: 142,
     tags: ["Entertainment"],
     pacificStationId: "97360",
     stationId: "63220",
@@ -227,6 +237,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   bloomberg: {
     name: "Bloomberg Television",
+    channelNumber: 25,
     tags: ["News"],
     stationId: "71799",
     services: {
@@ -251,6 +262,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   bravo: {
     name: "Bravo",
+    channelNumber: 59,
     tags: ["Entertainment"],
     stationId: "58625",
     services: {
@@ -276,6 +288,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   cartoon: {
     name: "Cartoon Network",
+    channelNumber: 100,
     tags: ["Kids"],
     pacificStationId: "67703",
     stationId: "60048",
@@ -300,6 +313,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   cbs: {
     name: "CBS",
+    channelNumber: 4,
     tags: ["Local"],
     services: {
       cox: { channelSelector: "CBS", url: "https://watchtv.cox.com/listings" },
@@ -315,6 +329,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   cbsnews: {
     name: "CBS News 24/7",
+    channelNumber: 9,
     tags: ["News"],
     stationId: "104846",
     services: {
@@ -338,6 +353,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   cmt: {
     name: "CMT",
+    channelNumber: 139,
     tags: ["Entertainment"],
     pacificStationId: "64610",
     stationId: "59440",
@@ -353,6 +369,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   cnbc: {
     name: "CNBC",
+    channelNumber: 5,
     tags: ["News"],
     stationId: "58780",
     services: {
@@ -379,6 +396,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   cnn: {
     name: "CNN",
+    channelNumber: 20,
     tags: ["News"],
     stationId: "58646",
     services: {
@@ -395,6 +413,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   cnni: {
     name: "CNN International",
+    channelNumber: 21,
     tags: ["News"],
     stationId: "83110",
     services: {
@@ -480,6 +499,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   cw: {
     name: "CW",
+    channelNumber: 11,
     tags: ["Local"],
     services: {
       cox: { channelSelector: "CW TV", url: "https://watchtv.cox.com/listings" },
@@ -523,6 +543,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   discoverylife: {
     name: "Discovery Life",
+    channelNumber: 58,
     tags: ["Documentary"],
     stationId: "92204",
     services: {
@@ -552,6 +573,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   disney: {
     name: "Disney",
+    channelNumber: 94,
     tags: ["Kids"],
     pacificStationId: "63320",
     stationId: "59684",
@@ -625,6 +647,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   espn: {
     name: "ESPN",
+    channelNumber: 30,
     tags: ["Sports"],
     stationId: "32645",
     services: {
@@ -642,6 +665,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   espn2: {
     name: "ESPN2",
+    channelNumber: 31,
     tags: ["Sports"],
     stationId: "45507",
     services: {
@@ -689,6 +713,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   espnews: {
     name: "ESPNews",
+    channelNumber: 33,
     tags: ["Sports"],
     stationId: "59976",
     services: {
@@ -705,6 +730,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   espnsec: {
     name: "SEC Network",
+    channelNumber: 44,
     tags: ["Sports"],
     stationId: "89714",
     services: {
@@ -721,6 +747,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   espnu: {
     name: "ESPNU",
+    channelNumber: 32,
     tags: ["Sports"],
     stationId: "60696",
     services: {
@@ -770,6 +797,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   food: {
     name: "Food Network",
+    channelNumber: 84,
     tags: ["Lifestyle"],
     pacificStationId: "82119",
     stationId: "50747",
@@ -787,6 +815,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   fox: {
     name: "Fox",
+    channelNumber: 12,
     tags: ["Local"],
     services: {
       cox: { channelSelector: "Fox", url: "https://watchtv.cox.com/listings" },
@@ -870,6 +899,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   fs1: {
     name: "FS1",
+    channelNumber: 34,
     tags: ["Sports"],
     stationId: "82547",
     services: {
@@ -887,6 +917,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   fs2: {
     name: "FS2",
+    channelNumber: 35,
     tags: ["Sports"],
     stationId: "59305",
     services: {
@@ -903,6 +934,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   fx: {
     name: "FX",
+    channelNumber: 53,
     tags: ["Entertainment"],
     stationId: "58574",
     services: {
@@ -944,6 +976,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   fxx: {
     name: "FXX",
+    channelNumber: 54,
     tags: ["Entertainment"],
     stationId: "66379",
     services: {
@@ -998,6 +1031,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   golf: {
     name: "Golf",
+    channelNumber: 41,
     tags: ["Sports"],
     stationId: "61854",
     services: {
@@ -1014,6 +1048,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   hallmark: {
     name: "Hallmark",
+    channelNumber: 91,
     tags: ["Entertainment"],
     pacificStationId: "66415",
     stationId: "66268",
@@ -1055,6 +1090,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   hbo: {
     name: "HBO",
+    channelNumber: 104,
     tags: [ "HBO", "Movies" ],
     stationId: "19548",
     services: {
@@ -1067,6 +1103,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   hbocomedy: {
     name: "HBO Comedy",
+    channelNumber: 60,
     tags: [ "HBO", "Movies" ],
     stationId: "59839",
     services: {
@@ -1103,6 +1140,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   hbomovies: {
     name: "HBO Movies",
+    channelNumber: 163,
     tags: [ "HBO", "Movies" ],
     stationId: "59845",
     services: {
@@ -1115,6 +1153,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   hgtv: {
     name: "HGTV",
+    channelNumber: 83,
     tags: ["Lifestyle"],
     pacificStationId: "87317",
     stationId: "49788",
@@ -1132,6 +1171,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   history: {
     name: "History",
+    channelNumber: 72,
     tags: ["Documentary"],
     pacificStationId: "88545",
     stationId: "57708",
@@ -1164,6 +1204,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   id: {
     name: "Investigation Discovery",
+    channelNumber: 148,
     tags: ["Documentary"],
     pacificStationId: "80309",
     stationId: "65342",
@@ -1216,6 +1257,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   lifetime: {
     name: "Lifetime",
+    channelNumber: 89,
     tags: ["Entertainment"],
     pacificStationId: "60250",
     stationId: "60150",
@@ -1232,6 +1274,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   lmn: {
     name: "Lifetime Movie Network",
+    channelNumber: 90,
     tags: [ "Entertainment", "Movies" ],
     pacificStationId: "92373",
     stationId: "55887",
@@ -1246,6 +1289,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   magnolia: {
     name: "Magnolia Network",
+    channelNumber: 85,
     tags: ["Lifestyle"],
     pacificStationId: "122081",
     stationId: "67375",
@@ -1307,6 +1351,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   msg: {
     name: "MSG",
+    channelNumber: 208,
     tags: ["Sports"],
     stationId: "35402",
     services: {
@@ -1316,6 +1361,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   msgsn: {
     name: "MSG Sportsnet",
+    channelNumber: 152,
     tags: ["Sports"],
     stationId: "35383",
     services: {
@@ -1342,6 +1388,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   mtv: {
     name: "MTV",
+    channelNumber: 134,
     tags: ["Entertainment"],
     pacificStationId: "64630",
     stationId: "60964",
@@ -1357,6 +1404,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   mtv2: {
     name: "MTV2",
+    channelNumber: 135,
     tags: ["Entertainment"],
     pacificStationId: "75506",
     stationId: "75077",
@@ -1422,6 +1470,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   nba: {
     name: "NBA TV",
+    channelNumber: 37,
     tags: ["Sports"],
     stationId: "45526",
     services: {
@@ -1451,6 +1500,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   nbcnews: {
     name: "NBC News Now",
+    channelNumber: 10,
     tags: ["News"],
     stationId: "114174",
     services: {
@@ -1493,6 +1543,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   nbcsn: {
     name: "NBC Sports Network",
+    channelNumber: 36,
     tags: ["Sports"],
     stationId: "194412",
     services: {
@@ -1547,6 +1598,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   own: {
     name: "OWN",
+    channelNumber: 86,
     tags: ["Lifestyle"],
     stationId: "70388",
     services: {
@@ -1562,6 +1614,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   oxygen: {
     name: "Oxygen",
+    channelNumber: 87,
     tags: ["Entertainment"],
     stationId: "70522",
     services: {
@@ -1586,6 +1639,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   paramount: {
     name: "Paramount Network",
+    channelNumber: 55,
     tags: ["Entertainment"],
     stationId: "59186",
     services: {
@@ -1608,6 +1662,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   pbs: {
     name: "PBS",
+    channelNumber: 13,
     tags: ["Local"],
     services: {
       cox: { channelSelector: "PBS", url: "https://watchtv.cox.com/listings" },
@@ -1674,6 +1729,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   showtime: {
     name: "Showtime",
+    channelNumber: 110,
     tags: [ "Movies", "Showtime" ],
     stationId: "91620",
     services: {
@@ -1719,6 +1775,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   starz: {
     name: "Starz",
+    channelNumber: 115,
     tags: [ "Movies", "Starz" ],
     stationId: "34941",
     services: {
@@ -1789,6 +1846,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   starzencore: {
     name: "Starz Encore",
+    channelNumber: 120,
     tags: [ "Movies", "Starz" ],
     stationId: "36225",
     services: {
@@ -1801,6 +1859,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   starzencoreaction: {
     name: "Starz Encore Action",
+    channelNumber: 177,
     tags: [ "Movies", "Starz" ],
     stationId: "72015",
     services: {
@@ -2010,6 +2069,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   syfy: {
     name: "Syfy",
+    channelNumber: 61,
     tags: ["Entertainment"],
     stationId: "58623",
     services: {
@@ -2035,6 +2095,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   tbs: {
     name: "TBS",
+    channelNumber: 51,
     tags: ["Entertainment"],
     stationId: "58515",
     services: {
@@ -2061,6 +2122,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   tcm: {
     name: "TCM",
+    channelNumber: 63,
     tags: ["Movies"],
     stationId: "64312",
     services: {
@@ -2087,6 +2149,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   tennis: {
     name: "Tennis Channel",
+    channelNumber: 42,
     tags: ["Sports"],
     stationId: "60316",
     services: {
@@ -2130,6 +2193,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   tnt: {
     name: "TNT",
+    channelNumber: 50,
     tags: ["Entertainment"],
     stationId: "42642",
     services: {
@@ -2156,6 +2220,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   travel: {
     name: "Travel",
+    channelNumber: 80,
     tags: ["Lifestyle"],
     pacificStationId: "64525",
     stationId: "59303",
@@ -2173,6 +2238,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   trutv: {
     name: "truTV",
+    channelNumber: 145,
     tags: ["Entertainment"],
     pacificStationId: "65717",
     stationId: "64490",
@@ -2199,6 +2265,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   tvland: {
     name: "TV Land",
+    channelNumber: 149,
     tags: ["Entertainment"],
     pacificStationId: "74134",
     stationId: "73541",
@@ -2214,6 +2281,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   usa: {
     name: "USA Network",
+    channelNumber: 52,
     tags: ["Entertainment"],
     stationId: "58452",
     services: {
@@ -2239,6 +2307,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   vh1: {
     name: "VH1",
+    channelNumber: 137,
     tags: ["Entertainment"],
     pacificStationId: "64634",
     stationId: "60046",
@@ -2270,6 +2339,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   weather: {
     name: "The Weather Channel",
+    channelNumber: 174,
     tags: ["News"],
     stationId: "58812",
     services: {
@@ -2298,6 +2368,7 @@ const BASE_CHANNEL_DEFINITIONS: Record<string, ChannelDefinition> = {
 
   yes: {
     name: "YES Network",
+    channelNumber: 196,
     tags: ["Sports"],
     stationId: "63558",
     services: {

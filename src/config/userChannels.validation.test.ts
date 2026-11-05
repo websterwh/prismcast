@@ -330,8 +330,8 @@ describe("validateChannelNumber - pure branches (excludeKey-irrelevant when valu
 
   test("parses leading-zero numbers correctly (parseInt strips them)", () => {
 
-    // parseInt("007", 10) returns 7 - the validator parses cleanly and the value is in range.
-    assert.equal(validateChannelNumber("007", "any-key"), undefined);
+    // parseInt("0150", 10) returns 150 - the validator parses cleanly and the value is in range.
+    assert.equal(validateChannelNumber("0150", "any-key"), undefined);
   });
 
   test("accepts floating-point notation because parseInt truncates the fractional part (1.5 parses to 1, in range)", () => {

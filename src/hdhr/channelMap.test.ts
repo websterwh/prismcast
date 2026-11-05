@@ -57,11 +57,13 @@ describe("buildChannelMap", () => {
   });
 
   test("uses numbers at or above AUTO_ASSIGN_START when no explicit assignments exist", () => {
+
     // The predefined catalog now has some explicit channelNumber values (e.g., abc=7, cbs=4).
     // Auto-assigned numbers should still be >= AUTO_ASSIGN_START (1000) and skip explicit numbers.
     const map = buildChannelMap();
 
     if(map.length === 0) {
+
       return;
     }
 
@@ -77,6 +79,7 @@ describe("buildChannelMap", () => {
   });
 
   test("auto-assigned numbers form a contiguous sequence starting at AUTO_ASSIGN_START", () => {
+
     // Auto-assigned numbers (those >= AUTO_ASSIGN_START) form a contiguous sequence.
     // Explicit numbers below AUTO_ASSIGN_START are not part of this sequence.
     const map = buildChannelMap();
@@ -85,11 +88,13 @@ describe("buildChannelMap", () => {
 
     // Verify contiguous sequence for auto-assigned numbers
     for(let i = 0; i < autoNumbers.length; i++) {
+
       assert.equal(autoNumbers[i], AUTO_ASSIGN_START + i, "auto-assigned entry " + String(i) + " has the expected sequential number");
     }
   });
 
   test("orders auto-assigned channels alphabetically by key", () => {
+
     // Auto-assigned channels (number >= AUTO_ASSIGN_START) are sorted alphabetically by key.
     // Explicit-number channels may appear anywhere in the sequence.
     const map = buildChannelMap();

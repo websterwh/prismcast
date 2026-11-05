@@ -666,19 +666,19 @@ export const yttvProvider: ProviderModule = {
   // video element.
   profile: {
 
-  // Speed optimizations: faster fullscreen (skip 3 retries = ~1.5s), tighter timeouts
-  aggressiveFullscreenFirst: true,
-  category: "multiChannel",
-  channelSelection: { strategy: "youtubeGrid" },
-  description: "YouTube TV with EPG grid channel selection. Set Channel Selector to the channel name as shown in the guide (e.g., CNN, ESPN, NBC).",
-  extends: "fullscreenApi",
-  fullscreenKey: "f",
-  fullscreenRetryDelay: 250,
-  fullscreenSelector: "button.ytp-fullscreen-button",
-  fullscreenVerifyDelay: 100,
-  segmentDuration: 1,
-  selectReadyVideo: true,
-  summary: "YouTube TV (guide grid, needs selector)"
+    // Speed optimizations: faster fullscreen (skip 3 retries = ~1.5s), tighter timeouts
+    aggressiveFullscreenFirst: true,
+    category: "multiChannel",
+    channelSelection: { strategy: "youtubeGrid" },
+    description: "YouTube TV with EPG grid channel selection. Set Channel Selector to the channel name as shown in the guide (e.g., CNN, ESPN, NBC).",
+    extends: "fullscreenApi",
+    fullscreenKey: "f",
+    fullscreenRetryDelay: 250,
+    fullscreenSelector: "button.ytp-fullscreen-button",
+    fullscreenVerifyDelay: 100,
+    segmentDuration: 1,
+    selectReadyVideo: true,
+    summary: "YouTube TV (guide grid, needs selector)"
   },
   profileName: "youtubeTV",
   slug: "yttv",

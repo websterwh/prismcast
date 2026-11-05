@@ -33,13 +33,13 @@ import type { TabReplacementResult } from "./recovery.ts";
 import { attemptNativeStreaming } from "../native/index.ts";
 import { createFMP4Segmenter } from "./fmp4Segmenter.ts";
 import { createHash } from "node:crypto";
+import { getProfileForChannel } from "../config/profiles.ts";
 import { getProviderBySlug } from "../browser/channelSelection.ts";
 import { registerClient } from "./clients.ts";
 import { snapshotStreamSettings } from "../config/streamSettings.ts";
 import { suppressPageAudio } from "../browser/video.ts";
 import { systemClock } from "homebridge-plugin-utils";
 import { triggerShowNameUpdate } from "./showInfo.ts";
-import { getProfileForChannel } from "../config/profiles.ts";
 
 /* This module handles HLS (HTTP Live Streaming) output using fMP4 (fragmented MP4) segments. HLS mode captures Matroska (the effective capture codec plus Opus)
  * from puppeteer-stream, which an FFmpeg child remuxes to fMP4 (transcoding the audio to AAC) before the fMP4 segmenter cuts it. The stream initialization flow
@@ -1243,6 +1243,7 @@ interface CreatePendingEntryOptions {
  * @returns The registered entry, the one carrier of the stream's ids, settings, and start instant down to its setup.
  */
 function createPendingEntry(options: CreatePendingEntryOptions): StreamRegistryEntry {
+
   const { channel, channelName, hls, numericStreamId, streamIdStr, url } = options;
 
   // The registration instant, read once so the one instant stamps both the access time and the entry's start.
@@ -1251,20 +1252,25 @@ function createPendingEntry(options: CreatePendingEntryOptions): StreamRegistryE
 
   // Apply profile segmentDuration override if available. This must happen at registration so the segmenter
   // receives the correct value. The profile is resolved from the channel or URL.
-    if(channel) {
-      const profile = getProfileForChannel(channel).profile;
-      if(profile.segmentDuration !== null && profile.segmentDuration !== undefined) {
-        Object.assign(settings, { segmentDuration: profile.segmentDuration });
-      }
+  if(channel) {
+
+    const profile = getProfileForChannel(channel).profile;
+
+    if(profile.segmentDuration !== null) {
+
+      Object.assign(settings, { segmentDuration: profile.segmentDuration });
     }
+  }
 
   const entry: StreamRegistryEntry = {
+
     channelName: channel?.name ?? null,
     clientAddress: options.clientAddress ?? null,
     hls,
     id: numericStreamId,
     identity: makePendingCaptureIdentity(),
     info: {
+
       lastPlaylistRequest: now,
       storeKey: channelName
     },

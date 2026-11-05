@@ -52,7 +52,9 @@ export const RESOLVED_SITE_PROFILE_KEYS = declareKeysOf<ResolvedSiteProfile>()([
  * @returns A ResolvedSiteProfile suitable for tests.
  */
 export function makeProfile(overrides: Partial<ResolvedSiteProfile> = {}): ResolvedSiteProfile {
+
   return {
+
     aggressiveFullscreenFirst: false,
     channelSelection: { strategy: "none" },
     channelSelector: null,

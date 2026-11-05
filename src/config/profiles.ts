@@ -111,11 +111,14 @@ export function resolveProfile(profileName: string | undefined): ResolvedSitePro
  * @returns A new profile with domain-level properties applied.
  */
 function mergeDomainProperties(profile: ResolvedSiteProfile, config: DomainConfig | undefined): ResolvedSiteProfile {
+
   if(!config) {
+
     return profile;
   }
 
   return {
+
     ...profile,
     ...(config.dismissSelector !== undefined ? { dismissSelector: config.dismissSelector } : {}),
     ...(config.hideSelector !== undefined ? { hideSelector: config.hideSelector } : {}),

@@ -408,6 +408,7 @@ describe("buildSpawnFFmpegArgs", () => {
    * before the spawn happens at runtime. The aac_at vs aac selection is platform-conditional and is documented separately.
    */
   test("includes the canonical FFmpeg input flags at the start of argv", () => {
+
     const args = buildSpawnFFmpegArgs(256000);
 
     // The input flags suppress banners and per-frame stats, restrict logging to warnings and errors, tolerate corrupt input frames, and cap input probing at 8KB.
@@ -566,6 +567,7 @@ describe("buildMpegTsRemuxerArgs", () => {
   });
 
   test("emits MPEG-TS with ATSC-conventional service and PID conventions", () => {
+
     const args = buildMpegTsRemuxerArgs("h264_mp4toannexb,dump_extra=freq=all");
 
     // Output container.

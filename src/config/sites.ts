@@ -473,6 +473,9 @@ export const DEFAULT_SITE_PROFILE: ResolvedSiteProfile = {
   // Don't search iframes - assume video is in main page DOM.
   needsIframeHandling: false,
 
+  // Not a static page capture - wait for video element and monitor playback.
+  segmentDuration: null,
+
   // Use first video element - assume only one video exists.
   selectReadyVideo: false,
 
@@ -481,10 +484,10 @@ export const DEFAULT_SITE_PROFILE: ResolvedSiteProfile = {
 
   // No requestFullscreen() call - CSS styling fills the capture.
   useRequestFullscreen: false,
+
   // No per-domain video timeout override - use the global default.
   videoTimeout: null,
-  // No per-site HLS segment duration override - use the global CONFIG.hls.segmentDuration.
-  segmentDuration: null,
+
   // Don't wait for network idle - assume player is ready on page load.
   waitForNetworkIdle: false
 };

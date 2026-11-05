@@ -1248,17 +1248,12 @@ function createPendingEntry(options: CreatePendingEntryOptions): StreamRegistryE
 
   // The registration instant, read once so the one instant stamps both the access time and the entry's start.
   const now = systemClock.now();
-  const settings = snapshotStreamSettings(CONFIG);
+  let settings = snapshotStreamSettings(CONFIG);
 
-  // Apply profile segmentDuration override if available. This must happen at registration so the segmenter
-  // receives the correct value. The profile is resolved from the channel or URL.
   if(channel) {
-
     const profile = getProfileForChannel(channel).profile;
-
     if(profile.segmentDuration !== null) {
-
-      Object.assign(settings, { segmentDuration: profile.segmentDuration });
+      settings = Object.freeze({ ...settings, segmentDuration: profile.segmentDuration });
     }
   }
 

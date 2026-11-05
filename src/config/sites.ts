@@ -343,7 +343,7 @@ export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
   "tbs.com": { profile: "fullscreenApi", service: "TBS.com" },
   "tntdrama.com": { profile: "fullscreenApi", service: "TNT" },
   "trutv.com": { profile: "fullscreenApi", service: "truTV" },
-  "tv.youtube.com": { iconUrl: "https://www.youtube.com/yts/img/favicon_144-vfliLAfaB.png", loginUrl: "https://tv.youtube.com/live",
+  "tv.youtube.com": { iconUrl: "https://www.youtube.com/yts/img/favicon_144-vfliLAfaB.png", loginUrl: "https://tv.youtube.com/live", videoTimeout: 30000, navigationTimeout: 30000,
     profile: "youtubeTV", service: "YouTube TV", serviceTag: "yttv" },
   "usanetwork.com": { iconUrl: "https://usanetwork.asset.viewlift.com/images/brand/2025/09/30/usa_favicon-1759230411162.ico",
     profile: "keyboardDynamicMultiVideo", service: "USA Network", serviceTag: "usa" },

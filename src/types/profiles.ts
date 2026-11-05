@@ -380,6 +380,9 @@ export interface DomainConfig {
   // Maximum time in milliseconds to wait for the video element to reach a playable state. When set, overrides the global videoTimeout setting for all channels on
   // this domain. Useful for sites with preroll ads or slow player initialization that need more time than the default. Omit to use the global default.
   videoTimeout?: number;
+  // Maximum time in milliseconds to wait for navigation to complete. When set, overrides the global navigationTimeout setting for all channels on
+  // this domain. Useful for sites with slow page loads or authentication flows that need more time than the default. Omit to use the global default.
+  navigationTimeout?: number;
 }
 
 /**

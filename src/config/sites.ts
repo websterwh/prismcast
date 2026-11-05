@@ -303,10 +303,10 @@ export const PROVIDER_PROFILES: Record<string, SiteProfile> = {
  */
 export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
 
-  "abc.com": { profile: "fullscreenApi", service: "ABC.com", videoTimeout: 45000, loginUrl: "https://abc.com/watch-live" },
+  "abc.com": { profile: "fullscreenApi", service: "ABC.com", videoTimeout: 45000, loginUrl: "https://abc.com/watch-live", maxContinuousPlayback: 4 },
   "aetv.com": { profile: "fullscreenApi", service: "A&E" },
   "c-span.org": { dismissSelector: ".videoAdUiSkipButtonExperimentalText", profile: "brightcove", service: "C-SPAN.org" },
-  "cbs.com": { dismissSelector: "#mvpd__getstarted", profile: "keyboardIframe", service: "CBS.com" },
+  "cbs.com": { dismissSelector: "#mvpd__getstarted", profile: "keyboardIframe", service: "CBS.com", maxContinuousPlayback: 4 },
   "cnbc.com": { profile: "fullscreenApi", service: "CNBC.com" },
   // CNN.com renders a Piano subscription offer into a fixed bar at the bottom of the page that stacks above the fullscreened video, so hideSelector keeps it out
   // of the capture. The bar's close control sits inside a cross-origin checkout iframe, which a synthetic dismissal click cannot reach.
@@ -316,7 +316,7 @@ export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
     profile: "disneyPlus", service: "Disney+", serviceTag: "disneyplus" },
   "espn.com": { profile: "keyboardMultiVideo", service: "ESPN.com" },
   "foodnetwork.com": { profile: "fullscreenApi", service: "Food Network" },
-  "fox.com": { loginUrl: "https://www.fox.com", profile: "foxLive", service: "Fox One", serviceTag: "foxone" },
+  "fox.com": { loginUrl: "https://www.fox.com", profile: "foxLive", service: "Fox One", serviceTag: "foxone", maxContinuousPlayback: 4 },
   "foxbusiness.com": { profile: "embeddedDynamicMultiVideo", service: "Fox Business" },
   "foxnews.com": { profile: "embeddedDynamicMultiVideo", service: "Fox News" },
   "foxsports.com": { profile: "fullscreenApi", service: "Fox Sports" },
@@ -326,7 +326,7 @@ export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
   "golfchannel.com": { profile: "fullscreenApi", service: "Golf Channel" },
   "hbomax.com": { profile: "hboMax", service: "HBO Max", serviceTag: "hbomax" },
   "history.com": { profile: "fullscreenApi", service: "History.com" },
-  "hulu.com": { iconUrl: "https://www.hulu.com/static/icons/apple-touch-icon.png", profile: "huluLive", service: "Hulu", serviceTag: "hulu", videoTimeout: 30000, navigationTimeout: 30000 },
+  "hulu.com": { iconUrl: "https://www.hulu.com/static/icons/apple-touch-icon.png", profile: "huluLive", service: "Hulu", serviceTag: "hulu", videoTimeout: 30000, navigationTimeout: 30000, maxContinuousPlayback: 4 },
   "lakeshorepbs.org": { profile: "embeddedPlayer", service: "Lakeshore PBS" },
   "ms.now": { profile: "keyboardDynamic", service: "MS NOW" },
   "mylifetime.com": { profile: "fullscreenApi", service: "Lifetime" },
@@ -343,7 +343,7 @@ export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
   "tbs.com": { profile: "fullscreenApi", service: "TBS.com" },
   "tntdrama.com": { profile: "fullscreenApi", service: "TNT" },
   "trutv.com": { profile: "fullscreenApi", service: "truTV" },
-  "tv.youtube.com": { iconUrl: "https://www.youtube.com/yts/img/favicon_144-vfliLAfaB.png", loginUrl: "https://tv.youtube.com/live", videoTimeout: 30000, navigationTimeout: 30000,
+  "tv.youtube.com": { iconUrl: "https://www.youtube.com/yts/img/favicon_144-vfliLAfaB.png", loginUrl: "https://tv.youtube.com/live", videoTimeout: 30000, navigationTimeout: 30000, maxContinuousPlayback: 4,
     profile: "youtubeTV", service: "YouTube TV", serviceTag: "yttv" },
   "usanetwork.com": { iconUrl: "https://usanetwork.asset.viewlift.com/images/brand/2025/09/30/usa_favicon-1759230411162.ico",
     profile: "keyboardDynamicMultiVideo", service: "USA Network", serviceTag: "usa" },

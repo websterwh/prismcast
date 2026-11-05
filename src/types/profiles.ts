@@ -365,6 +365,7 @@ export interface DomainConfig {
   // Per-site HLS segment duration override in seconds. When set, overrides the global hls.segmentDuration setting for streams on this domain.
   // Shorter segments reduce end-to-end latency but increase playlist/segment overhead. Typical range: 1-4 seconds.
   segmentDuration?: number;
+  needsIframeHandling?: boolean;
   // Site profile name for automatic profile detection. When a URL matches this domain, the specified profile is used to configure site-specific behavior
   // (fullscreen method, iframe handling, etc.). Omit for domains that only need a display name.
   profile?: string;

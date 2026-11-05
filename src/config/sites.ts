@@ -176,7 +176,7 @@ export const SITE_PROFILES: Record<string, SiteProfile> = {
     fullscreenKey: null,
     fullscreenRetryDelay: 500,
     fullscreenVerifyDelay: 200,
-    summary: "Player exposes the fullscreen API"
+    summary: "Player exposes the fullscreen API",
   },
 
   // Profile for sites that use keyboard fullscreen and also need time for network activity to settle before the player is fully initialized. These sites dynamically
@@ -303,7 +303,7 @@ export const PROVIDER_PROFILES: Record<string, SiteProfile> = {
  */
 export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
 
-  "abc.com": { profile: "keyboardMultiVideo", service: "ABC.com" },
+  "abc.com": { profile: "fullscreenApi", service: "ABC.com", videoTimeout: 45000, loginUrl: "https://abc.com/watch-live" },
   "aetv.com": { profile: "fullscreenApi", service: "A&E" },
   "c-span.org": { dismissSelector: ".videoAdUiSkipButtonExperimentalText", profile: "brightcove", service: "C-SPAN.org" },
   "cbs.com": { dismissSelector: "#mvpd__getstarted", profile: "keyboardIframe", service: "CBS.com" },

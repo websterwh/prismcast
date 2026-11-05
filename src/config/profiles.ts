@@ -124,7 +124,8 @@ function mergeDomainProperties(profile: ResolvedSiteProfile, config: DomainConfi
     ...(config.hideSelector !== undefined ? { hideSelector: config.hideSelector } : {}),
     ...(config.maxContinuousPlayback !== undefined ? { maxContinuousPlayback: config.maxContinuousPlayback } : {}),
     ...(config.videoTimeout !== undefined ? { videoTimeout: config.videoTimeout } : {}),
-    ...(config.segmentDuration !== undefined ? { segmentDuration: config.segmentDuration } : {})
+    ...(config.segmentDuration !== undefined ? { segmentDuration: config.segmentDuration } : {}),
+    ...(config.needsIframeHandling !== undefined ? { needsIframeHandling: config.needsIframeHandling } : {})
   };
 }
 

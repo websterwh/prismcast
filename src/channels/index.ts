@@ -2551,8 +2551,8 @@ function flattenChannelDefinitions(definitions: Record<string, ChannelDefinition
       continue;
     }
 
-    const authenticatedServices = new Set(["yttv", "hulu", "sling", "disneyplus", "foxone", "directv", "spectrum", "xfinity", "cox", "paramountplus"]);
-    const authenticatedPriority = ["yttv", "hulu", "sling", "disneyplus", "foxone", "directv", "spectrum", "xfinity", "cox", "paramountplus"];
+    const authenticatedServices = new Set([ "yttv", "hulu", "sling", "disneyplus", "foxone", "directv", "spectrum", "xfinity", "cox", "paramountplus" ]);
+    const authenticatedPriority = [ "yttv", "hulu", "sling", "disneyplus", "foxone", "directv", "spectrum", "xfinity", "cox", "paramountplus" ];
     const canonicalSlug = authenticatedPriority.find(s => slugs.includes(s)) ?? (slugs.includes(SITE_KEY) ? SITE_KEY : firstSlug);
     const canonicalVariant = def.services[canonicalSlug];
 

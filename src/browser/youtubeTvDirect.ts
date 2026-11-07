@@ -39,22 +39,78 @@ export async function queryYouTubeTvHlsManifest(page: Page): Promise<Nullable<Yo
     return null;
   }
   const url = page.url();
-  const match = /\/watch\/([^?]+)\?vp=([^&]+)/.exec(url);
-
-  if(!match) {
-
-    LOG.debug("tuning:yttv", "Could not extract videoId and playbackToken from URL.");
-
-    return null;
+  LOG.debug("tuning:yttv", "Current page URL for InnerTube query: %s.", url);
+  
+  // Try multiple URL patterns to extract videoId and playbackToken
+  let videoId: string | null = null;
+  let playbackToken: string | null = null;
+  
+  // Pattern 1: /watch/VIDEO_ID?vp=PLAYBACK_TOKEN
+  let match = /\/watch\/([^?]+)\?vp=([^&]+)/.exec(url);
+  if(match) {
+    videoId = match[1] ?? null;
+    playbackToken = match[2] ?? null;
   }
-
-  const videoId = match[1];
-  const playbackToken = match[2];
+  
+  // Pattern 2: /live/VIDEO_ID?vp=PLAYBACK_TOKEN (newer format)
+  if(!videoId) {
+    match = /\/live\/([^?]+)\?vp=([^&]+)/.exec(url);
+    if(match) {
+      videoId = match[1] ?? null;
+      playbackToken = match[2] ?? null;
+    }
+  }
+  
+  // Pattern 3: Try to extract from page content (window.ytcfg or similar)
+  if(!videoId || !playbackToken) {
+    try {
+      const pageData = await evaluateWithAbort(page, (): { videoId: string | null; playbackToken: string | null } => {
+        // Try to find videoId and vp in various places
+        let foundVideoId: string | null = null;
+        let foundPlaybackToken: string | null = null;
+        
+        // Check window.ytcfg
+        const win = window as { ytcfg?: { data?: { VIDEO_ID?: string; video_id?: string; VP?: string; vp?: string } }; ytInitialData?: { contents?: unknown } };
+        if(win.ytcfg && win.ytcfg.data) {
+          foundVideoId = win.ytcfg.data.VIDEO_ID ?? win.ytcfg.data.video_id ?? null;
+          foundPlaybackToken = win.ytcfg.data.VP ?? win.ytcfg.data.vp ?? null;
+        }
+        
+        // Check ytInitialData
+        if(!foundVideoId && win.ytInitialData) {
+          const contents = win.ytInitialData.contents;
+          if(contents) {
+            const jsonStr = JSON.stringify(contents);
+            const videoIdMatch = jsonStr.match(/"videoId"\s*:\s*"([^"]+)"/);
+            const vpMatch = jsonStr.match(/"vp"\s*:\s*"([^"]+)"/);
+            if(videoIdMatch) foundVideoId = videoIdMatch[1] ?? null;
+            if(vpMatch) foundPlaybackToken = vpMatch[1] ?? null;
+          }
+        }
+        
+        // Check URL parameters as last resort
+        if(!foundVideoId) {
+          const urlParams = new URLSearchParams(window.location.search);
+          foundVideoId = urlParams.get("v") ?? urlParams.get("video_id") ?? null;
+          foundPlaybackToken = urlParams.get("vp") ?? null;
+        }
+        
+        return { videoId: foundVideoId, playbackToken: foundPlaybackToken };
+      }, undefined, { timeoutMs: 5000 });
+      
+      if(pageData.videoId) videoId = pageData.videoId;
+      if(pageData.playbackToken) playbackToken = pageData.playbackToken;
+    } catch {
+      // Ignore extraction errors
+    }
+  }
 
   if(!videoId || !playbackToken) {
-
+    LOG.debug("tuning:yttv", "Could not extract videoId and playbackToken from URL or page. URL was: %s, videoId: %s, playbackToken: %s.", url, videoId, playbackToken);
     return null;
   }
+  
+  LOG.debug("tuning:yttv", "Extracted videoId: %s, playbackToken: %s.", videoId, playbackToken);
   const urlResult = { playbackToken, videoId };
 
   // Query InnerTube API from browser context with iOS client to get HLS manifest
@@ -104,6 +160,8 @@ export async function queryYouTubeTvHlsManifest(page: Page): Promise<Nullable<Yo
 
       if(!streamingData.hlsManifestUrl) {
 
+        LOG.debug("tuning:yttv", "InnerTube response missing hlsManifestUrl. Response: %s.", JSON.stringify(data).slice(0, 500));
+
         return null;
       }
 
@@ -113,7 +171,9 @@ export async function queryYouTubeTvHlsManifest(page: Page): Promise<Nullable<Yo
         playbackToken: params.playbackToken,
         videoId: params.videoId
       };
-    } catch {
+    } catch(error) {
+
+      LOG.debug("tuning:yttv", "InnerTube API fetch error: %s.", String(error));
 
       return null;
     }

@@ -1251,8 +1251,11 @@ function createPendingEntry(options: CreatePendingEntryOptions): StreamRegistryE
   let settings = snapshotStreamSettings(CONFIG);
 
   if(channel) {
+
     const profile = getProfileForChannel(channel).profile;
+
     if(profile.segmentDuration !== null) {
+
       settings = Object.freeze({ ...settings, segmentDuration: profile.segmentDuration });
     }
   }

@@ -326,7 +326,16 @@ export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
   "golfchannel.com": { profile: "fullscreenApi", service: "Golf Channel" },
   "hbomax.com": { profile: "hboMax", service: "HBO Max", serviceTag: "hbomax" },
   "history.com": { profile: "fullscreenApi", service: "History.com" },
-  "hulu.com": { iconUrl: "https://www.hulu.com/static/icons/apple-touch-icon.png", maxContinuousPlayback: 4, navigationTimeout: 30000, profile: "huluLive", service: "Hulu", serviceTag: "hulu", videoTimeout: 30000 },
+  "hulu.com": {
+
+    iconUrl: "https://www.hulu.com/static/icons/apple-touch-icon.png",
+    maxContinuousPlayback: 4,
+    navigationTimeout: 30000,
+    profile: "huluLive",
+    service: "Hulu",
+    serviceTag: "hulu",
+    videoTimeout: 30000
+  },
   "lakeshorepbs.org": { profile: "embeddedPlayer", service: "Lakeshore PBS" },
   "ms.now": { profile: "keyboardDynamic", service: "MS NOW" },
   "mylifetime.com": { profile: "fullscreenApi", service: "Lifetime" },

@@ -21,7 +21,9 @@ const SITE_KEY = "site";
  * canonicalKey set to its parent definition's key, which buildServiceGroups in services.ts uses to assemble service groups.
  *
  * Canonical resolution rules:
- * 1. If "site" exists in services and no authenticated streaming service (hulu, yttv, sling, spectrum, xfinity, directv, disneyplus, foxone, cox, paramountplus) is available, the canonical gets the site URL.
+ * 1. If "site" exists in services and no authenticated streaming service (hulu,
+ * yttv, sling, spectrum, xfinity, directv, disneyplus, foxone, cox,
+ * paramountplus) is available, the canonical gets the site URL.
  * 2. Otherwise, the service whose key sorts first alphabetically (computed, not source-order) becomes canonical.
  *
  * Adding a service whose slug sorts after the current canonical never changes it; introducing a "site" entry or an alphabetically-earlier slug does.
@@ -2551,7 +2553,6 @@ function flattenChannelDefinitions(definitions: Record<string, ChannelDefinition
       continue;
     }
 
-    const authenticatedServices = new Set([ "yttv", "hulu", "sling", "disneyplus", "foxone", "directv", "spectrum", "xfinity", "cox", "paramountplus" ]);
     const authenticatedPriority = [ "yttv", "hulu", "sling", "disneyplus", "foxone", "directv", "spectrum", "xfinity", "cox", "paramountplus" ];
     const canonicalSlug = authenticatedPriority.find(s => slugs.includes(s)) ?? (slugs.includes(SITE_KEY) ? SITE_KEY : firstSlug);
     const canonicalVariant = def.services[canonicalSlug];

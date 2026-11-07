@@ -217,8 +217,10 @@ export interface SiteProfile {
   // Whether the video element is embedded in an iframe. When true, the stream handler searches all frames in the page for the video element rather than only the
   // main document. An iframe initialization delay is applied before searching to allow the iframe content to load.
   needsIframeHandling?: boolean;
-  // Maximum time in milliseconds to wait for iframe initialization before searching for video elements. When set, overrides the global iframeInitDelay setting for all channels on
-  // this domain. Useful for sites with complex embedded players that load additional resources after the iframe element appears. Omit to use the global default.
+  // Maximum time in milliseconds to wait for iframe initialization before searching for
+  // video elements. When set, overrides the global iframeInitDelay setting for all channels on
+  // this domain. Useful for sites with complex embedded players that load additional
+  // resources after the iframe element appears. Omit to use the global default.
   iframeInitDelay?: number;
 
   // Whether to select the video element by readyState rather than DOM position. Some pages have multiple video elements (ads, previews, the main content). When
@@ -365,12 +367,16 @@ export interface DomainConfig {
   // Maximum continuous playback duration in hours before the site enforces a stream cutoff. When set, the playback monitor proactively reloads the page before this
   // limit expires to maintain uninterrupted streaming. Fractional values are supported (e.g., 1.5 for 90 minutes). Omit for sites that allow indefinite playback.
   maxContinuousPlayback?: number;
-  // Per-site HLS segment duration override in seconds. When set, overrides the global hls.segmentDuration setting for streams on this domain.
-  // Shorter segments reduce end-to-end latency but increase playlist/segment overhead. Typical range: 1-4 seconds.
+  // Per-site HLS segment duration override in seconds. When set, overrides the global
+  // hls.segmentDuration setting for streams on this domain. Shorter segments reduce
+  // end-to-end latency but increase playlist/segment overhead. Typical range: 1-4 seconds.
   segmentDuration?: number;
   needsIframeHandling?: boolean;
-  // Maximum time in milliseconds to wait for iframe initialization before searching for video elements. When set, overrides the global iframeInitDelay setting for all channels on
-  // this domain. Useful for sites with complex embedded players that load additional resources after the iframe element appears. Omit to use the global default.
+  // Maximum time in milliseconds to wait for iframe initialization before
+  // searching for video elements. When set, overrides the global iframeInitDelay
+  // setting for all channels on this domain. Useful for sites with complex
+  // embedded players that load additional resources after the iframe element
+  // appears. Omit to use the global default.
   iframeInitDelay?: number;
   // Site profile name for automatic profile detection. When a URL matches this domain, the specified profile is used to configure site-specific behavior
   // (fullscreen method, iframe handling, etc.). Omit for domains that only need a display name.
